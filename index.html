@@ -945,6 +945,9 @@ tbody tr:last-child td { border-bottom: none; }
       <div class="nav-item" onclick="showPage('announcements')">
         <span class="nav-icon">📢</span> Duyurular
       </div>
+      <div class="nav-item" onclick="showPage('magazine')">
+        <span class="nav-icon">📖</span> Dergi
+      </div>
       <div class="nav-section-title" id="adminNavSection">Yönetim</div>
       <div class="nav-item admin-only" onclick="showPage('pending')">
         <span class="nav-icon">⏳</span> Yanıt Bekleyenler
@@ -1124,6 +1127,22 @@ tbody tr:last-child td { border-bottom: none; }
         <button class="btn-action editor-only" onclick="openModal('modalAnnouncement')">+ Duyuru Ekle</button>
       </div>
       <div id="announcementList"></div>
+    </div>
+
+    <!-- ─── MAGAZINE ─── -->
+    <div id="page-magazine" class="page">
+      <div class="page-header">
+        <div>
+          <div class="page-title">📖 Aylık Dergi Arşivi</div>
+          <div class="page-subtitle">Meclisimizin aylık olarak yayınladığı dergi sayıları.</div>
+        </div>
+      </div>
+
+      <!-- Bu ayın dergisi (öne çıkan) -->
+      <div id="featuredMagazine"></div>
+
+      <!-- Geçmiş sayılar -->
+      <div id="magazineArchive" style="display:none;"></div>
     </div>
 
     <!-- ─── PENDING RESPONSES (Admin Only) ─── -->
@@ -1430,6 +1449,56 @@ tbody tr:last-child td { border-bottom: none; }
   </div>
 </div>
 
+<!-- Dergi Yükle -->
+<div class="modal-overlay" id="modalMagazine">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">📖 Yeni Dergi Sayısı Yükle</div>
+      <button class="modal-close" onclick="closeModal('modalMagazine')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="grid-2">
+        <div class="form-group">
+          <label>Yıl</label>
+          <select id="magYear"></select>
+        </div>
+        <div class="form-group">
+          <label>Ay</label>
+          <select id="magMonth">
+            <option value="0">Ocak</option><option value="1">Şubat</option><option value="2">Mart</option>
+            <option value="3">Nisan</option><option value="4">Mayıs</option><option value="5">Haziran</option>
+            <option value="6">Temmuz</option><option value="7">Ağustos</option><option value="8">Eylül</option>
+            <option value="9">Ekim</option><option value="10">Kasım</option><option value="11">Aralık</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Sayı (opsiyonel)</label>
+        <input type="text" id="magIssue" placeholder="Örn: 12. Sayı">
+      </div>
+      <div class="form-group">
+        <label>Açıklama / Bu sayıda</label>
+        <textarea class="note-editor" id="magDesc" placeholder="Bu sayının kapak konusu ve içeriği hakkında kısa bilgi..." style="min-height:90px;"></textarea>
+      </div>
+      <div class="form-group">
+        <label>PDF Dosyası</label>
+        <input type="file" id="magPdfFile" accept="application/pdf" onchange="handleMagazineFile()">
+        <div style="font-size:11px; color:var(--gray); margin-top:6px;">⚠️ Maksimum dosya boyutu: 4 MB. Daha büyük dosyalar için sıkıştırılmış sürümünü yükleyin.</div>
+        <div id="magFilePreview" style="display:none; margin-top:10px; padding:10px 12px; background:var(--cream); border-radius:6px; font-size:12px;"></div>
+      </div>
+      <div class="form-group">
+        <label>Kapak Görseli (opsiyonel)</label>
+        <input type="file" id="magCoverFile" accept="image/*" onchange="handleCoverFile()">
+        <div id="magCoverPreview" style="display:none; margin-top:10px;"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('modalMagazine')">İptal</button>
+      <button class="btn-action" onclick="saveMagazine()">Yayınla</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
@@ -1509,7 +1578,7 @@ function getStore(key, def) {
 function setStore(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
 
 // Veri versiyonu: yeni özellik eklendiğinde artırılırsa eski veriyi sıfırlar
-const DATA_VERSION = 'v4';
+const DATA_VERSION = 'v5';
 if (localStorage.getItem('gm_version') !== DATA_VERSION) {
   localStorage.removeItem('gm_data');
   localStorage.setItem('gm_version', DATA_VERSION);
@@ -1541,9 +1610,26 @@ function getData() {
       { id: 2, title: 'Yeni Üye Başvuruları Açıldı', body: '2026 yılı meclis üyeliği başvuruları başlamıştır. Son başvuru tarihi 28 Şubat 2026.', priority: 'normal', author: 'Taha Yılmaz', date: '2026-02-10' },
       { id: 3, title: 'Web Sistemi Devreye Alındı', body: 'Gençlik Meclisi yönetim sistemimiz artık aktif. Tüm üyelerimizi sisteme kaydolmaya davet ediyoruz.', priority: 'normal', author: 'Taha Yılmaz', date: '2026-02-20' },
     ],
-    responses: []  // { meetingId, userId, userName, status: 'katılıyor'|'katılmıyor', excuse, date }
+    responses: [],  // { meetingId, userId, userName, status, excuse, date }
+    magazines: []   // { id, year, month, issue, desc, fileName, fileSize, cover, uploadedBy, uploadDate }
   };
   return getStore('gm_data', def);
+}
+
+// PDF dosyaları ayrı saklanır (ana data'yı şişirmemek için)
+function getMagazineFile(id) {
+  return localStorage.getItem('gm_mag_' + id);
+}
+function setMagazineFile(id, dataUrl) {
+  try {
+    localStorage.setItem('gm_mag_' + id, dataUrl);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+function deleteMagazineFile(id) {
+  localStorage.removeItem('gm_mag_' + id);
 }
 
 function saveData(d) { setStore('gm_data', d); }
@@ -1599,6 +1685,7 @@ function showPage(p) {
   if (p === 'admin') renderAdmin();
   if (p === 'analytics') renderAnalytics();
   if (p === 'pending') renderPending();
+  if (p === 'magazine') renderMagazine();
 }
 
 // ═══════════════════════════════════════════════
@@ -1632,6 +1719,19 @@ function getNextMeetingAlert() {
   let month = now.getMonth();
   let secondFri = getSecondFriday(year, month);
   let firstFri = getFirstFriday(year, month);
+
+  // ── ÖZEL DURUM: Mayıs 2026 — Çorlu Belediye Meclisi sunumu nedeniyle uzatma ──
+  // Normalde toplantı günü (8 Mayıs Cuma) sonrası uyarı kapanır,
+  // ancak bu sefer 9 Mayıs sonuna kadar görünür kalsın.
+  const extendedEnd_2026_05 = new Date(2026, 4, 9, 23, 59, 59); // 9 Mayıs 2026 23:59
+  if (year === 2026 && month === 4 && now <= extendedEnd_2026_05) {
+    return {
+      showAlert: true,
+      meetingDate: secondFri,
+      meetingDateStr: dateToStr(secondFri),
+      daysUntil: Math.ceil((secondFri - now) / (1000 * 60 * 60 * 24))
+    };
+  }
 
   // Bu ayın 2. cuması geçtiyse, sonraki aya bakalım
   if (now > secondFri) {
@@ -2060,6 +2160,197 @@ function roleBadge(role) {
   if (role === 'Asbaşkan') return 'badge-navy';
   if (role === 'Komisyon Sözcüsü') return 'badge-purple';
   return 'badge-gray';
+}
+
+// ═══════════════════════════════════════════════
+// MAGAZINE / DERGİ
+// ═══════════════════════════════════════════════
+
+let magazineFileData = null; // geçici PDF data URL
+let magazineCoverData = null; // geçici cover data URL
+
+function handleMagazineFile() {
+  const file = document.getElementById('magPdfFile').files[0];
+  const preview = document.getElementById('magFilePreview');
+  if (!file) { magazineFileData = null; preview.style.display = 'none'; return; }
+
+  if (file.type !== 'application/pdf') {
+    showToast('Sadece PDF dosyası yükleyebilirsiniz.', 'error');
+    document.getElementById('magPdfFile').value = '';
+    return;
+  }
+
+  // Yaklaşık 4 MB (5MB raw, base64'te ~33% büyür)
+  if (file.size > 4 * 1024 * 1024) {
+    showToast('Dosya çok büyük! Maksimum 4 MB olmalı.', 'error');
+    document.getElementById('magPdfFile').value = '';
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    magazineFileData = e.target.result;
+    preview.style.display = 'block';
+    preview.innerHTML = `📄 <strong>${file.name}</strong> &nbsp;·&nbsp; ${(file.size/1024/1024).toFixed(2)} MB`;
+  };
+  reader.readAsDataURL(file);
+}
+
+function handleCoverFile() {
+  const file = document.getElementById('magCoverFile').files[0];
+  const preview = document.getElementById('magCoverPreview');
+  if (!file) { magazineCoverData = null; preview.style.display = 'none'; return; }
+  if (file.size > 1 * 1024 * 1024) {
+    showToast('Kapak görseli en fazla 1 MB olabilir.', 'error');
+    document.getElementById('magCoverFile').value = '';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = e => {
+    magazineCoverData = e.target.result;
+    preview.style.display = 'block';
+    preview.innerHTML = `<img src="${e.target.result}" style="max-width:120px; max-height:160px; border-radius:6px; box-shadow:var(--shadow);">`;
+  };
+  reader.readAsDataURL(file);
+}
+
+function saveMagazine() {
+  const year = parseInt(document.getElementById('magYear').value);
+  const month = parseInt(document.getElementById('magMonth').value);
+  const issue = document.getElementById('magIssue').value.trim();
+  const desc = document.getElementById('magDesc').value.trim();
+
+  if (!magazineFileData) {
+    showToast('Lütfen bir PDF dosyası seçin.', 'error');
+    return;
+  }
+
+  const d = getData();
+  // Aynı ay-yıl için zaten dergi varsa uyar
+  const existing = d.magazines.find(m => m.year === year && m.month === month);
+  if (existing) {
+    if (!confirm(`${MONTHS_TR[month]} ${year} sayısı zaten yüklü. Üzerine yazmak istiyor musunuz?`)) return;
+    deleteMagazineFile(existing.id);
+    d.magazines = d.magazines.filter(m => m.id !== existing.id);
+  }
+
+  const id = Date.now();
+  // PDF'i ayrı kaydet
+  const ok = setMagazineFile(id, magazineFileData);
+  if (!ok) {
+    showToast('Tarayıcı depolama dolu. Eski sayıları silmeniz gerekebilir.', 'error');
+    return;
+  }
+
+  // Kapak da ayrı saklansın
+  if (magazineCoverData) {
+    try { localStorage.setItem('gm_cover_' + id, magazineCoverData); } catch (e) {}
+  }
+
+  d.magazines.push({
+    id,
+    year,
+    month,
+    issue,
+    desc,
+    fileName: document.getElementById('magPdfFile').files[0].name,
+    fileSize: document.getElementById('magPdfFile').files[0].size,
+    hasCover: !!magazineCoverData,
+    uploadedBy: currentUser.name,
+    uploadDate: new Date().toISOString().split('T')[0]
+  });
+  saveData(d);
+
+  closeModal('modalMagazine');
+  renderMagazine();
+  showToast('Dergi yayınlandı!', 'success');
+
+  // Formu temizle
+  document.getElementById('magIssue').value = '';
+  document.getElementById('magDesc').value = '';
+  document.getElementById('magPdfFile').value = '';
+  document.getElementById('magCoverFile').value = '';
+  document.getElementById('magFilePreview').style.display = 'none';
+  document.getElementById('magCoverPreview').style.display = 'none';
+  magazineFileData = null;
+  magazineCoverData = null;
+}
+
+function viewMagazine(id) {
+  const pdf = getMagazineFile(id);
+  if (!pdf) { showToast('Dosya bulunamadı.', 'error'); return; }
+  // Yeni sekmede aç
+  const win = window.open();
+  if (win) {
+    win.document.write(`
+      <html><head><title>Dergi</title></head>
+      <body style="margin:0; height:100vh;">
+        <embed src="${pdf}" type="application/pdf" width="100%" height="100%">
+      </body></html>
+    `);
+  } else {
+    showToast('Pop-up engellendi! Lütfen izin verin.', 'error');
+  }
+}
+
+function downloadMagazine(id) {
+  const d = getData();
+  const mag = d.magazines.find(m => m.id === id);
+  const pdf = getMagazineFile(id);
+  if (!pdf || !mag) { showToast('Dosya bulunamadı.', 'error'); return; }
+  const link = document.createElement('a');
+  link.href = pdf;
+  link.download = mag.fileName || `Dergi-${MONTHS_TR[mag.month]}-${mag.year}.pdf`;
+  link.click();
+}
+
+function deleteMagazine(id) {
+  if (!confirm('Bu dergi sayısını silmek istediğinize emin misiniz?')) return;
+  const d = getData();
+  d.magazines = d.magazines.filter(m => m.id !== id);
+  saveData(d);
+  deleteMagazineFile(id);
+  localStorage.removeItem('gm_cover_' + id);
+  renderMagazine();
+  showToast('Dergi silindi.', 'success');
+}
+
+function renderMagazine() {
+  const featuredEl = document.getElementById('featuredMagazine');
+  const archiveEl = document.getElementById('magazineArchive');
+
+  featuredEl.innerHTML = `
+    <div style="background:linear-gradient(135deg, var(--navy), var(--navy-light)); border-radius:14px; padding:48px 32px; color:var(--white); text-align:center; position:relative; overflow:hidden; box-shadow:var(--shadow-lg);">
+      <div style="position:absolute; top:-60px; right:-60px; width:240px; height:240px; background:radial-gradient(circle, rgba(200,168,75,0.18) 0%, transparent 70%); border-radius:50%;"></div>
+      <div style="position:absolute; bottom:-80px; left:-80px; width:280px; height:280px; background:radial-gradient(circle, rgba(200,168,75,0.08) 0%, transparent 70%); border-radius:50%;"></div>
+      <div style="position:relative; z-index:1;">
+        <div style="font-size:64px; margin-bottom:16px;">📖</div>
+        <div style="font-family:'Playfair Display', serif; font-size:28px; font-weight:700; margin-bottom:8px;">Aylık Dergi Arşivi</div>
+        <div style="display:inline-block; padding:6px 16px; background:rgba(200,168,75,0.2); color:var(--gold); border-radius:20px; font-size:11px; letter-spacing:2px; text-transform:uppercase; margin-bottom:20px;">⏳ Yakında</div>
+        <div style="font-size:14px; color:rgba(255,255,255,0.8); line-height:1.7; max-width:520px; margin:0 auto;">
+          Dergimizin aylık sayılarına buradan erişebileceksiniz. Bu özellik bulut depolama altyapısı ile birlikte yakında devreye alınacaktır.
+        </div>
+        <div style="display:flex; gap:24px; justify-content:center; margin-top:32px; flex-wrap:wrap; padding-top:24px; border-top:1px solid rgba(255,255,255,0.1);">
+          <div style="text-align:center;">
+            <div style="font-size:24px; margin-bottom:4px;">📚</div>
+            <div style="font-size:11px; color:rgba(255,255,255,0.6); letter-spacing:1px;">Tüm Sayılar</div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-size:24px; margin-bottom:4px;">⬇️</div>
+            <div style="font-size:11px; color:rgba(255,255,255,0.6); letter-spacing:1px;">PDF İndirme</div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-size:24px; margin-bottom:4px;">🔍</div>
+            <div style="font-size:11px; color:rgba(255,255,255,0.6); letter-spacing:1px;">Sayı Arşivi</div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-size:24px; margin-bottom:4px;">☁️</div>
+            <div style="font-size:11px; color:rgba(255,255,255,0.6); letter-spacing:1px;">Bulut Depolama</div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  archiveEl.innerHTML = '';
 }
 
 function renderPending() {

@@ -946,6 +946,9 @@ tbody tr:last-child td { border-bottom: none; }
         <span class="nav-icon">📢</span> Duyurular
       </div>
       <div class="nav-section-title" id="adminNavSection">Yönetim</div>
+      <div class="nav-item admin-only" onclick="showPage('pending')">
+        <span class="nav-icon">⏳</span> Yanıt Bekleyenler
+      </div>
       <div class="nav-item admin-only" onclick="showPage('analytics')">
         <span class="nav-icon">📈</span> Katılım Analizi
       </div>
@@ -973,6 +976,9 @@ tbody tr:last-child td { border-bottom: none; }
           <button class="btn-action editor-only" onclick="openModal('modalMeeting')">+ Toplantı</button>
         </div>
       </div>
+
+      <!-- Yaklaşan Toplantı Uyarı Banner -->
+      <div id="meetingAlert" style="display:none; margin-bottom:24px;"></div>
 
       <div class="stats-grid">
         <div class="stat-card" data-icon="👥">
@@ -1118,6 +1124,18 @@ tbody tr:last-child td { border-bottom: none; }
         <button class="btn-action editor-only" onclick="openModal('modalAnnouncement')">+ Duyuru Ekle</button>
       </div>
       <div id="announcementList"></div>
+    </div>
+
+    <!-- ─── PENDING RESPONSES (Admin Only) ─── -->
+    <div id="page-pending" class="page">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Yanıt Bekleyenler</div>
+          <div class="page-subtitle">Yaklaşan toplantıya henüz yanıt vermemiş üyeler.</div>
+        </div>
+      </div>
+
+      <div id="pendingContent"></div>
     </div>
 
     <!-- ─── ANALYTICS ─── -->
@@ -1372,6 +1390,46 @@ tbody tr:last-child td { border-bottom: none; }
   </div>
 </div>
 
+<!-- Mazeret Bildir -->
+<div class="modal-overlay" id="modalExcuse">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">📝 Mazeret Bildir</div>
+      <button class="modal-close" onclick="closeModal('modalExcuse')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:rgba(192,57,43,0.06); border-left:3px solid var(--red); padding:14px; border-radius:8px; margin-bottom:20px;">
+        <div style="font-size:13px; color:var(--navy); font-weight:600; margin-bottom:4px;" id="excuseMeetingTitle">-</div>
+        <div style="font-size:12px; color:var(--gray);" id="excuseMeetingDate">-</div>
+      </div>
+      <div class="form-group">
+        <label>Mazeretiniz</label>
+        <textarea class="note-editor" id="excuseText" placeholder="Toplantıya neden katılamayacağınızı yazınız..." style="min-height:120px;"></textarea>
+        <div style="font-size:11px; color:var(--gray); margin-top:6px;">⚠️ Mazeret bildirmek zorunludur. Asbaşkan ve Başkan tarafından görüntülenecektir.</div>
+      </div>
+      <input type="hidden" id="excuseMeetingId">
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('modalExcuse')">İptal</button>
+      <button class="btn-action" style="background:linear-gradient(135deg, var(--red), #d35243);" onclick="saveExcuse()">Mazereti Gönder</button>
+    </div>
+  </div>
+</div>
+
+<!-- Mazeret Listesi (Admin) -->
+<div class="modal-overlay" id="modalExcuseList">
+  <div class="modal" style="max-width:680px;">
+    <div class="modal-header">
+      <div class="modal-title" id="excuseListTitle">Mazeret Listesi</div>
+      <button class="modal-close" onclick="closeModal('modalExcuseList')">✕</button>
+    </div>
+    <div class="modal-body" id="excuseListBody"></div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('modalExcuseList')">Kapat</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
@@ -1451,7 +1509,7 @@ function getStore(key, def) {
 function setStore(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
 
 // Veri versiyonu: yeni özellik eklendiğinde artırılırsa eski veriyi sıfırlar
-const DATA_VERSION = 'v2';
+const DATA_VERSION = 'v4';
 if (localStorage.getItem('gm_version') !== DATA_VERSION) {
   localStorage.removeItem('gm_data');
   localStorage.setItem('gm_version', DATA_VERSION);
@@ -1482,7 +1540,8 @@ function getData() {
       { id: 1, title: 'Şubat Toplantısı Hakkında', body: '25 Şubat 2026 tarihinde yapılacak olağan toplantımıza tüm üyelerimizin katılması beklenmektedir.', priority: 'önemli', author: 'Elif Kaya', date: '2026-02-18' },
       { id: 2, title: 'Yeni Üye Başvuruları Açıldı', body: '2026 yılı meclis üyeliği başvuruları başlamıştır. Son başvuru tarihi 28 Şubat 2026.', priority: 'normal', author: 'Taha Yılmaz', date: '2026-02-10' },
       { id: 3, title: 'Web Sistemi Devreye Alındı', body: 'Gençlik Meclisi yönetim sistemimiz artık aktif. Tüm üyelerimizi sisteme kaydolmaya davet ediyoruz.', priority: 'normal', author: 'Taha Yılmaz', date: '2026-02-20' },
-    ]
+    ],
+    responses: []  // { meetingId, userId, userName, status: 'katılıyor'|'katılmıyor', excuse, date }
   };
   return getStore('gm_data', def);
 }
@@ -1539,6 +1598,292 @@ function showPage(p) {
   if (p === 'meetings') renderCalendar();
   if (p === 'admin') renderAdmin();
   if (p === 'analytics') renderAnalytics();
+  if (p === 'pending') renderPending();
+}
+
+// ═══════════════════════════════════════════════
+// MEETING ALERT — Her ayın 2. cuması toplantı
+// 1 hafta kala (ayın 1. cuması) uyarı çıkar
+// ═══════════════════════════════════════════════
+
+function getSecondFriday(year, month) {
+  // month: 0-11
+  const first = new Date(year, month, 1);
+  const firstDay = first.getDay(); // 0=Paz, 5=Cuma
+  let firstFridayDate = (5 - firstDay + 7) % 7 + 1;
+  return new Date(year, month, firstFridayDate + 7);
+}
+
+function getFirstFriday(year, month) {
+  const first = new Date(year, month, 1);
+  const firstDay = first.getDay();
+  let firstFridayDate = (5 - firstDay + 7) % 7 + 1;
+  return new Date(year, month, firstFridayDate);
+}
+
+function dateToStr(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function getNextMeetingAlert() {
+  // Bugün hangi ayda? Bu ayın 2. cuması geçti mi?
+  const now = new Date();
+  let year = now.getFullYear();
+  let month = now.getMonth();
+  let secondFri = getSecondFriday(year, month);
+  let firstFri = getFirstFriday(year, month);
+
+  // Bu ayın 2. cuması geçtiyse, sonraki aya bakalım
+  if (now > secondFri) {
+    month++;
+    if (month > 11) { month = 0; year++; }
+    secondFri = getSecondFriday(year, month);
+    firstFri = getFirstFriday(year, month);
+  }
+
+  // Uyarı: 1. cumadan 2. cumaya kadar göster
+  // Yani "şimdi" 1. cumadan büyükse VE 2. cumadan küçükse uyarı aktif
+  const showAlert = now >= firstFri && now <= secondFri;
+
+  return {
+    showAlert,
+    meetingDate: secondFri,
+    meetingDateStr: dateToStr(secondFri),
+    daysUntil: Math.ceil((secondFri - now) / (1000 * 60 * 60 * 24))
+  };
+}
+
+function ensureScheduledMeeting(meetingDateStr) {
+  // 2. cuma toplantısını otomatik takvime ekle (yoksa)
+  const d = getData();
+  const existing = d.meetings.find(m => m.date === meetingDateStr && m.scheduled);
+  if (existing) return existing;
+
+  const meeting = {
+    id: Date.now() + Math.random(),
+    title: 'Aylık Olağan Toplantı',
+    date: meetingDateStr,
+    time: '18:00',
+    place: 'Çorlu Belediyesi Meclis Salonu',
+    agenda: '1. Açılış\n2. Önceki tutanağın okunması\n3. Komisyon raporları\n4. Gündem maddeleri\n5. Dilek ve temenniler\n6. Kapanış',
+    attendees: d.members.map(m => m.id),
+    scheduled: true  // otomatik oluşturulan toplantı
+  };
+  d.meetings.push(meeting);
+  saveData(d);
+  return meeting;
+}
+
+function getUserResponse(meetingId, userId) {
+  const d = getData();
+  return (d.responses || []).find(r => r.meetingId === meetingId && r.userId === userId);
+}
+
+function setUserResponse(meetingId, status, excuse) {
+  const d = getData();
+  d.responses = d.responses || [];
+  const existing = d.responses.findIndex(r => r.meetingId === meetingId && r.userId === currentUser.id);
+  const record = {
+    meetingId,
+    userId: currentUser.id,
+    userName: currentUser.name,
+    status,
+    excuse: excuse || '',
+    date: new Date().toISOString()
+  };
+  if (existing > -1) d.responses[existing] = record;
+  else d.responses.push(record);
+  saveData(d);
+}
+
+function renderMeetingAlert() {
+  const alert = getNextMeetingAlert();
+  const banner = document.getElementById('meetingAlert');
+  if (!alert.showAlert || !currentUser) {
+    banner.style.display = 'none';
+    return;
+  }
+
+  // Toplantıyı takvime ekle (yoksa)
+  const meeting = ensureScheduledMeeting(alert.meetingDateStr);
+  const response = getUserResponse(meeting.id, currentUser.id);
+
+  const dateStr = `${alert.meetingDate.getDate()} ${MONTHS_TR[alert.meetingDate.getMonth()]} ${alert.meetingDate.getFullYear()} Cuma`;
+  const daysText = alert.daysUntil === 0 ? 'BUGÜN' : alert.daysUntil === 1 ? 'YARIN' : `${alert.daysUntil} GÜN SONRA`;
+
+  // Admin için: yanıt veren kişi sayıları
+  const d = getData();
+  const responses = (d.responses || []).filter(r => r.meetingId === meeting.id);
+  const yesCount = responses.filter(r => r.status === 'katılıyor').length;
+  const noCount = responses.filter(r => r.status === 'katılmıyor').length;
+  const totalMembers = d.members.length;
+  const pendingCount = totalMembers - responses.length;
+
+  let responseHTML = '';
+  if (response) {
+    if (response.status === 'katılıyor') {
+      responseHTML = `
+        <div style="background:rgba(30,122,92,0.12); padding:14px 18px; border-radius:10px; display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:16px;">
+          <div style="font-size:13px; color:var(--green); font-weight:600;">
+            ✅ Toplantıya katılacağınızı bildirdiniz.
+          </div>
+          <button class="btn-secondary" style="padding:6px 14px; font-size:11px;" onclick="changeResponse(${meeting.id})">Yanıtı Değiştir</button>
+        </div>`;
+    } else {
+      responseHTML = `
+        <div style="background:rgba(192,57,43,0.08); padding:14px 18px; border-radius:10px; margin-top:16px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:8px;">
+            <div style="font-size:13px; color:var(--red); font-weight:600;">
+              ❌ Mazeret bildirildi.
+            </div>
+            <button class="btn-secondary" style="padding:6px 14px; font-size:11px;" onclick="changeResponse(${meeting.id})">Yanıtı Değiştir</button>
+          </div>
+          <div style="font-size:12px; color:var(--navy); padding:8px 12px; background:var(--white); border-radius:6px; margin-top:8px; white-space:pre-wrap;">"${response.excuse}"</div>
+        </div>`;
+    }
+  } else {
+    responseHTML = `
+      <div style="display:flex; gap:10px; margin-top:18px; flex-wrap:wrap;">
+        <button class="btn-action" style="background:linear-gradient(135deg, var(--green), #2a9b75); flex:1; min-width:160px;" onclick="respondMeeting(${meeting.id}, 'katılıyor')">
+          ✅ Katılacağım
+        </button>
+        <button class="btn-action" style="background:linear-gradient(135deg, var(--red), #d35243); flex:1; min-width:160px;" onclick="respondMeeting(${meeting.id}, 'katılmıyor')">
+          ❌ Katılamayacağım
+        </button>
+      </div>`;
+  }
+
+  // Admin için özet ve liste butonu
+  let adminSummary = '';
+  if (isAdmin()) {
+    adminSummary = `
+      <div style="display:flex; gap:8px; margin-top:14px; flex-wrap:wrap; padding-top:14px; border-top:1px solid rgba(255,255,255,0.1); align-items:center;">
+        <span class="badge badge-green">✅ Katılacak: ${yesCount}</span>
+        <span class="badge badge-red">❌ Mazeret: ${noCount}</span>
+        <span class="badge badge-gray">⏳ Yanıt bekleyen: ${pendingCount}</span>
+        <button class="btn-secondary" style="padding:5px 12px; font-size:11px; margin-left:auto;" onclick="showPage('pending')">Detayları Gör →</button>
+      </div>`;
+  }
+
+  banner.innerHTML = `
+    <div style="background:linear-gradient(135deg, var(--navy), var(--navy-light)); border-radius:14px; padding:24px 28px; color:var(--white); position:relative; overflow:hidden; box-shadow:var(--shadow-lg);">
+      <div style="position:absolute; top:-40px; right:-40px; width:180px; height:180px; background:radial-gradient(circle, rgba(200,168,75,0.2) 0%, transparent 70%); border-radius:50%;"></div>
+      <div style="position:relative; z-index:1;">
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+          <span class="badge badge-gold" style="padding:5px 12px; font-size:11px;">⏰ ${daysText}</span>
+          <span style="font-size:11px; letter-spacing:2px; color:var(--gold); text-transform:uppercase;">Yaklaşan Toplantı</span>
+        </div>
+        <div style="font-family:'Playfair Display', serif; font-size:22px; font-weight:600; margin-bottom:6px;">Aylık Olağan Toplantı</div>
+        <div style="font-size:14px; color:rgba(255,255,255,0.85);">📅 ${dateStr} &nbsp;·&nbsp; 🕐 ${meeting.time} &nbsp;·&nbsp; 📍 ${meeting.place}</div>
+        ${responseHTML}
+        ${adminSummary}
+      </div>
+    </div>`;
+  banner.style.display = 'block';
+}
+
+function respondMeeting(meetingId, status) {
+  if (status === 'katılıyor') {
+    setUserResponse(meetingId, 'katılıyor');
+    showToast('✅ Katılım kaydedildi!', 'success');
+    renderMeetingAlert();
+  } else {
+    // Mazeret formunu aç
+    const d = getData();
+    const meeting = d.meetings.find(m => m.id === meetingId);
+    if (!meeting) return;
+    document.getElementById('excuseMeetingId').value = meetingId;
+    document.getElementById('excuseMeetingTitle').textContent = meeting.title;
+    document.getElementById('excuseMeetingDate').textContent = `📅 ${formatDate(meeting.date)} · 🕐 ${meeting.time}`;
+    document.getElementById('excuseText').value = '';
+    openModal('modalExcuse');
+  }
+}
+
+function saveExcuse() {
+  const meetingId = parseFloat(document.getElementById('excuseMeetingId').value);
+  const excuse = document.getElementById('excuseText').value.trim();
+  if (!excuse || excuse.length < 10) {
+    showToast('Lütfen en az 10 karakter mazeret yazınız.', 'error');
+    return;
+  }
+  setUserResponse(meetingId, 'katılmıyor', excuse);
+  closeModal('modalExcuse');
+  showToast('Mazeretiniz iletildi.', 'success');
+  renderMeetingAlert();
+}
+
+function changeResponse(meetingId) {
+  if (!confirm('Yanıtınızı değiştirmek istediğinize emin misiniz?')) return;
+  const d = getData();
+  d.responses = (d.responses || []).filter(r => !(r.meetingId === meetingId && r.userId === currentUser.id));
+  saveData(d);
+  renderMeetingAlert();
+}
+
+function openExcuseList(meetingId) {
+  const d = getData();
+  const meeting = d.meetings.find(m => m.id === meetingId);
+  const responses = (d.responses || []).filter(r => r.meetingId === meetingId);
+  const respondedIds = responses.map(r => r.userId);
+  const pending = d.members.filter(m => !respondedIds.includes(m.id));
+
+  const yesResponses = responses.filter(r => r.status === 'katılıyor');
+  const noResponses = responses.filter(r => r.status === 'katılmıyor');
+
+  document.getElementById('excuseListTitle').textContent = `${meeting ? meeting.title : 'Toplantı'} — Yanıtlar`;
+
+  let html = '';
+
+  // Mazeret bildirenler
+  html += `<div style="margin-bottom:24px;">
+    <div style="font-size:13px; font-weight:600; color:var(--red); margin-bottom:12px; padding-bottom:8px; border-bottom:1px solid var(--gray-light);">
+      ❌ Mazeret Bildirenler (${noResponses.length})
+    </div>`;
+  if (!noResponses.length) {
+    html += `<div style="color:var(--gray); font-size:12px; padding:8px 0;">Mazeret bildiren yok.</div>`;
+  } else {
+    html += noResponses.map(r => `
+      <div style="background:rgba(192,57,43,0.06); padding:12px 14px; border-radius:8px; margin-bottom:10px; border-left:3px solid var(--red);">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+          <strong style="font-size:13px;">${r.userName}</strong>
+          <span style="font-size:11px; color:var(--gray);">${formatDate(r.date.split('T')[0])}</span>
+        </div>
+        <div style="font-size:13px; color:var(--navy); white-space:pre-wrap; padding:8px 10px; background:var(--white); border-radius:6px;">"${r.excuse}"</div>
+      </div>`).join('');
+  }
+  html += `</div>`;
+
+  // Katılacaklar
+  html += `<div style="margin-bottom:24px;">
+    <div style="font-size:13px; font-weight:600; color:var(--green); margin-bottom:12px; padding-bottom:8px; border-bottom:1px solid var(--gray-light);">
+      ✅ Katılacaklar (${yesResponses.length})
+    </div>`;
+  if (!yesResponses.length) {
+    html += `<div style="color:var(--gray); font-size:12px; padding:8px 0;">Henüz katılım onayı yok.</div>`;
+  } else {
+    html += `<div style="display:flex; flex-wrap:wrap; gap:8px;">` + yesResponses.map(r =>
+      `<span class="badge badge-green" style="padding:6px 12px;">${r.userName}</span>`
+    ).join('') + `</div>`;
+  }
+  html += `</div>`;
+
+  // Yanıt bekleyenler
+  html += `<div>
+    <div style="font-size:13px; font-weight:600; color:var(--gray); margin-bottom:12px; padding-bottom:8px; border-bottom:1px solid var(--gray-light);">
+      ⏳ Yanıt Bekleyenler (${pending.length})
+    </div>`;
+  if (!pending.length) {
+    html += `<div style="color:var(--gray); font-size:12px; padding:8px 0;">Tüm üyeler yanıt verdi.</div>`;
+  } else {
+    html += `<div style="display:flex; flex-wrap:wrap; gap:8px;">` + pending.map(m =>
+      `<span class="badge badge-gray" style="padding:6px 12px;">${m.name}</span>`
+    ).join('') + `</div>`;
+  }
+  html += `</div>`;
+
+  document.getElementById('excuseListBody').innerHTML = html;
+  openModal('modalExcuseList');
 }
 
 // ═══════════════════════════════════════════════
@@ -1555,6 +1900,7 @@ function renderAll() {
   renderMembers(d);
   renderAnnouncements(d);
   renderCalendar();
+  renderMeetingAlert();
 }
 
 function renderStats(d) {
@@ -1714,6 +2060,173 @@ function roleBadge(role) {
   if (role === 'Asbaşkan') return 'badge-navy';
   if (role === 'Komisyon Sözcüsü') return 'badge-purple';
   return 'badge-gray';
+}
+
+function renderPending() {
+  const d = getData();
+  const alert = getNextMeetingAlert();
+  const el = document.getElementById('pendingContent');
+
+  // Yaklaşan toplantı var mı?
+  if (!alert.showAlert) {
+    el.innerHTML = `
+      <div class="card">
+        <div class="card-body">
+          <div class="empty-state">
+            <div class="empty-state-icon">📅</div>
+            <div class="empty-state-text" style="font-size:15px; margin-bottom:8px;">Aktif yaklaşan toplantı yok</div>
+            <div style="font-size:12px; color:var(--gray); max-width:400px; margin:0 auto;">
+              Yanıt takibi, her ayın 1. cuması başlar ve 2. cuma (toplantı günü) sona erer.
+              Şu anda aktif bir yanıt dönemi bulunmamaktadır.
+            </div>
+          </div>
+        </div>
+      </div>`;
+    return;
+  }
+
+  // Yaklaşan toplantıyı bul/ekle
+  const meeting = ensureScheduledMeeting(alert.meetingDateStr);
+  const responses = (d.responses || []).filter(r => r.meetingId === meeting.id);
+  const respondedIds = responses.map(r => r.userId);
+  const pending = d.members.filter(m => !respondedIds.includes(m.id));
+  const yesResponses = responses.filter(r => r.status === 'katılıyor');
+  const noResponses = responses.filter(r => r.status === 'katılmıyor');
+  const totalMembers = d.members.length;
+  const responseRate = totalMembers > 0 ? Math.round(((totalMembers - pending.length) / totalMembers) * 100) : 0;
+
+  const meetingDate = new Date(meeting.date);
+  const dateStr = `${meetingDate.getDate()} ${MONTHS_TR[meetingDate.getMonth()]} ${meetingDate.getFullYear()} Cuma`;
+
+  let html = `
+    <!-- Toplantı Bilgi Kartı -->
+    <div style="background:linear-gradient(135deg, var(--navy), var(--navy-light)); border-radius:14px; padding:24px 28px; color:var(--white); margin-bottom:24px; position:relative; overflow:hidden; box-shadow:var(--shadow);">
+      <div style="position:absolute; top:-40px; right:-40px; width:180px; height:180px; background:radial-gradient(circle, rgba(200,168,75,0.15) 0%, transparent 70%); border-radius:50%;"></div>
+      <div style="position:relative; z-index:1;">
+        <div style="font-size:11px; letter-spacing:2px; color:var(--gold); text-transform:uppercase; margin-bottom:8px;">Yaklaşan Toplantı</div>
+        <div style="font-family:'Playfair Display', serif; font-size:22px; font-weight:600; margin-bottom:6px;">${meeting.title}</div>
+        <div style="font-size:14px; color:rgba(255,255,255,0.85);">📅 ${dateStr} &nbsp;·&nbsp; 🕐 ${meeting.time} &nbsp;·&nbsp; 📍 ${meeting.place}</div>
+      </div>
+    </div>
+
+    <!-- İstatistikler -->
+    <div class="stats-grid" style="grid-template-columns: repeat(4, 1fr);">
+      <div class="stat-card" data-icon="👥">
+        <div class="stat-label">Toplam Üye</div>
+        <div class="stat-value">${totalMembers}</div>
+      </div>
+      <div class="stat-card" data-icon="✅" style="border-left-color: var(--green)">
+        <div class="stat-label">Katılacak</div>
+        <div class="stat-value" style="color:var(--green);">${yesResponses.length}</div>
+      </div>
+      <div class="stat-card" data-icon="❌" style="border-left-color: var(--red)">
+        <div class="stat-label">Mazeretli</div>
+        <div class="stat-value" style="color:var(--red);">${noResponses.length}</div>
+      </div>
+      <div class="stat-card" data-icon="⏳" style="border-left-color: var(--gold)">
+        <div class="stat-label">Yanıt Bekleyen</div>
+        <div class="stat-value" style="color:#8a6a1a;">${pending.length}</div>
+        <div class="stat-sub">Yanıt oranı: %${responseRate}</div>
+      </div>
+    </div>
+  `;
+
+  // Yanıt vermeyenler tablosu (ana içerik)
+  html += `
+    <div class="card" style="margin-bottom:20px;">
+      <div class="card-header">
+        <div class="card-title">⏳ Yanıt Vermeyen Üyeler (${pending.length})</div>
+      </div>
+      <div class="card-body">
+  `;
+
+  if (!pending.length) {
+    html += `
+      <div class="empty-state" style="padding:40px 20px;">
+        <div class="empty-state-icon">🎉</div>
+        <div class="empty-state-text" style="font-size:15px; color:var(--green); font-weight:600;">Tüm üyeler yanıt verdi!</div>
+        <div style="font-size:12px; color:var(--gray); margin-top:8px;">Bu toplantı için bekleyen yanıt yok.</div>
+      </div>
+    `;
+  } else {
+    html += `
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Üye</th>
+              <th>Rol</th>
+              <th>İletişim</th>
+              <th>Durum</th>
+              <th>İşlem</th>
+            </tr>
+          </thead>
+          <tbody>
+    `;
+    html += pending.map(m => `
+      <tr>
+        <td>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <div class="user-avatar" style="width:36px; height:36px; font-size:13px; background:var(--navy-light);">${m.name.split(' ').map(x=>x[0]).slice(0,2).join('')}</div>
+            <strong>${m.name}</strong>
+          </div>
+        </td>
+        <td><span class="badge ${roleBadge(m.role)}">${m.role}</span></td>
+        <td>
+          <div style="font-size:12px;">${m.email}</div>
+          <div style="font-size:11px; color:var(--gray);">${m.phone}</div>
+        </td>
+        <td><span class="badge badge-gold">⏳ Yanıt bekleniyor</span></td>
+        <td>
+          <div style="display:flex; gap:6px;">
+            ${m.phone ? `<a href="tel:${m.phone.replace(/\s/g,'')}" class="btn-action" style="padding:5px 12px; font-size:11px; text-decoration:none; display:inline-block;">📞 Ara</a>` : ''}
+            <a href="https://wa.me/9${m.phone.replace(/\s/g,'')}?text=Sayın ${encodeURIComponent(m.name.split(' ')[0])}, ${encodeURIComponent(dateStr + ' tarihindeki ' + meeting.title + ' toplantısına katılım durumunuzu sistemden bildirmenizi rica ederiz.')}" target="_blank" class="btn-action" style="padding:5px 12px; font-size:11px; background:linear-gradient(135deg, #25D366, #128C7E); text-decoration:none; display:inline-block;">💬 WhatsApp</a>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+    html += `</tbody></table></div>`;
+  }
+  html += `</div></div>`;
+
+  // Mazeret bildirenler
+  if (noResponses.length) {
+    html += `
+      <div class="card" style="margin-bottom:20px;">
+        <div class="card-header">
+          <div class="card-title">❌ Mazeret Bildirenler (${noResponses.length})</div>
+        </div>
+        <div class="card-body">
+    `;
+    html += noResponses.map(r => `
+      <div style="background:rgba(192,57,43,0.06); padding:14px 16px; border-radius:8px; margin-bottom:10px; border-left:3px solid var(--red);">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
+          <strong style="font-size:13px;">${r.userName}</strong>
+          <span style="font-size:11px; color:var(--gray);">📅 ${formatDate(r.date.split('T')[0])}</span>
+        </div>
+        <div style="font-size:13px; color:var(--navy); white-space:pre-wrap; padding:10px 12px; background:var(--white); border-radius:6px; line-height:1.5;">"${r.excuse}"</div>
+      </div>
+    `).join('');
+    html += `</div></div>`;
+  }
+
+  // Katılacaklar
+  if (yesResponses.length) {
+    html += `
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">✅ Katılacaklar (${yesResponses.length})</div>
+        </div>
+        <div class="card-body">
+          <div style="display:flex; flex-wrap:wrap; gap:8px;">
+            ${yesResponses.map(r => `<span class="badge badge-green" style="padding:7px 14px; font-size:12px;">${r.userName}</span>`).join('')}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  el.innerHTML = html;
 }
 
 function renderAnalytics() {

@@ -698,6 +698,9 @@ tbody tr:last-child td { border-bottom: none; }
 .page { display: none; }
 .page.active { display: block; }
 
+/* Yetki bazlı öğeler — JS gösterene kadar gizli */
+.admin-only, .editor-only { display: none; }
+
 .divider { height: 1px; background: var(--gray-light); margin: 20px 0; }
 
 .empty-state {
@@ -871,12 +874,104 @@ tbody tr:last-child td { border-bottom: none; }
 .search-input:focus { border-color: var(--navy-light); }
 
 .inline-flex { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+
+/* ─── FIREBASE EK STILLER ─── */
+.auth-tabs {
+  display: flex;
+  gap: 4px;
+  background: var(--gray-light);
+  padding: 4px;
+  border-radius: 10px;
+  margin-bottom: 28px;
+}
+.auth-tab {
+  flex: 1;
+  padding: 10px;
+  text-align: center;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  color: var(--gray);
+}
+.auth-tab.active { background: var(--white); color: var(--navy); box-shadow: var(--shadow); }
+
+.auth-form { display: none; }
+.auth-form.active { display: block; }
+
+.spinner {
+  width: 16px; height: 16px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: var(--white);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  display: inline-block;
+  vertical-align: middle;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.full-loader {
+  position: fixed; inset: 0;
+  background: var(--navy);
+  display: flex; align-items: center; justify-content: center;
+  flex-direction: column;
+  gap: 20px;
+  z-index: 99999;
+}
+.full-loader .spinner {
+  width: 40px; height: 40px;
+  border-width: 3px;
+  border-top-color: var(--gold);
+}
+.full-loader-text { color: var(--gold); font-size: 13px; letter-spacing: 2px; text-transform: uppercase; }
+
+.info-box {
+  padding: 14px 16px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.6;
+  margin-bottom: 16px;
+}
+.info-box.blue { background: rgba(26,51,102,0.07); color: var(--navy); border-left: 3px solid var(--navy-light); }
+.info-box.gold { background: rgba(200,168,75,0.1); color: #8a6a1a; border-left: 3px solid var(--gold); }
+.info-box.red { background: rgba(192,57,43,0.07); color: var(--red); border-left: 3px solid var(--red); }
+.info-box.green { background: rgba(30,122,92,0.08); color: var(--green); border-left: 3px solid var(--green); }
+
+.pending-card {
+  background: var(--white);
+  border: 1.5px solid var(--gray-light);
+  border-radius: 12px;
+  padding: 18px;
+  margin-bottom: 12px;
+}
+.pending-card.highlight { border-color: var(--gold); background: rgba(200,168,75,0.04); }
+
+.notif-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px; height: 18px;
+  background: var(--red);
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 9px;
+  padding: 0 5px;
+  margin-left: auto;
+}
 </style>
 </head>
 <body>
 
-<!-- ═══ LOGIN PAGE ═══ -->
-<div id="loginPage">
+<!-- ═══ TAM EKRAN YÜKLENİYOR ═══ -->
+<div class="full-loader" id="fullLoader">
+  <div class="spinner"></div>
+  <div class="full-loader-text">Yükleniyor...</div>
+</div>
+
+<!-- ═══ GİRİŞ / KAYIT SAYFASI ═══ -->
+<div id="loginPage" style="display:none;">
   <div class="login-left">
     <div class="login-emblem">🏛️</div>
     <div class="login-title">Gençlik<br>Meclisi</div>
@@ -890,30 +985,78 @@ tbody tr:last-child td { border-bottom: none; }
   </div>
   <div class="login-divider"></div>
   <div class="login-right">
-    <h2>Giriş Yap</h2>
-    <p>Hesabınızla giriş yaparak devam edin.</p>
-    <div class="form-group">
-      <label>E-posta</label>
-      <input type="email" id="loginEmail" placeholder="ornek@meclis.gov.tr" value="asbaskan@meclis.gov.tr">
+    <div class="auth-tabs">
+      <div class="auth-tab active" id="tabLogin" onclick="switchAuthTab('login')">Giriş Yap</div>
+      <div class="auth-tab" id="tabRegister" onclick="switchAuthTab('register')">Kayıt Ol</div>
     </div>
-    <div class="form-group">
-      <label>Şifre</label>
-      <input type="password" id="loginPassword" placeholder="••••••••" value="123456">
+
+    <!-- GİRİŞ FORMU -->
+    <div class="auth-form active" id="formLogin">
+      <h2>Hoş Geldiniz</h2>
+      <p>Hesabınızla giriş yaparak devam edin.</p>
+      <div class="form-group">
+        <label>E-posta</label>
+        <input type="email" id="loginEmail" placeholder="ornek@eposta.com">
+      </div>
+      <div class="form-group">
+        <label>Şifre</label>
+        <input type="password" id="loginPassword" placeholder="••••••••">
+      </div>
+      <button class="btn-primary" id="loginBtn" onclick="doLogin()">Giriş Yap</button>
+      <div id="loginError"></div>
     </div>
-    <button class="btn-primary" onclick="doLogin()">Giriş Yap</button>
-    <div class="login-demo">
-      <strong>Demo Hesaplar:</strong><br>
-      asbaskan@meclis.gov.tr / 123456 → Asbaşkan<br>
-      baskan@meclis.gov.tr / 123456 → Başkan<br>
-      sozcu@meclis.gov.tr / 123456 → Komisyon Sözcüsü<br>
-      uye@meclis.gov.tr / 123456 → Üye
+
+    <!-- KAYIT FORMU -->
+    <div class="auth-form" id="formRegister">
+      <h2>Üyelik Başvurusu</h2>
+      <p>Bilgilerinizi girin, başvurunuz yönetici onayına gönderilsin.</p>
+      <div class="info-box gold">
+        ⏳ Kaydınız tamamlandıktan sonra <strong>Başkan veya Asbaşkan onayı</strong> beklenir. Onaylandığında giriş yapabilirsiniz.
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label>Ad</label><input type="text" id="regFirst" placeholder="Adınız"></div>
+        <div class="form-group"><label>Soyad</label><input type="text" id="regLast" placeholder="Soyadınız"></div>
+      </div>
+      <div class="form-group"><label>E-posta</label><input type="email" id="regEmail" placeholder="ornek@eposta.com"></div>
+      <div class="form-group"><label>Telefon</label><input type="tel" id="regPhone" placeholder="0555 123 4567"></div>
+      <div class="form-group"><label>Şifre</label><input type="password" id="regPassword" placeholder="En az 6 karakter"></div>
+      <div class="form-group"><label>Şifre Tekrar</label><input type="password" id="regPassword2" placeholder="Şifreyi tekrar girin"></div>
+      <button class="btn-primary" id="registerBtn" onclick="doRegister()">Başvuru Gönder</button>
+      <div id="registerError"></div>
     </div>
   </div>
 </div>
 
-<!-- ═══ APP ═══ -->
-<div id="app">
-  <!-- SIDEBAR -->
+<!-- ═══ ONAY BEKLEME EKRANI ═══ -->
+<div id="pendingPage" style="display:none; min-height:100vh; background:var(--navy); align-items:center; justify-content:center; padding:40px;">
+  <div style="background:var(--white); border-radius:16px; padding:48px; max-width:460px; text-align:center; box-shadow:var(--shadow-lg);">
+    <div style="font-size:56px; margin-bottom:16px;">⏳</div>
+    <h2 style="font-family:'Playfair Display',serif; font-size:24px; color:var(--navy); margin-bottom:12px;">Başvurunuz İnceleniyor</h2>
+    <p style="color:var(--gray); font-size:14px; line-height:1.6; margin-bottom:24px;">
+      Üyelik başvurunuz <strong>Başkan veya Asbaşkan onayı</strong> beklemektedir. Onaylandığında bu e-posta ile giriş yapabilirsiniz.
+    </p>
+    <div class="info-box blue" style="text-align:left;">
+      📧 <strong id="pendingEmail">-</strong><br>
+      Onay durumunuz değiştiğinde tekrar giriş yapmayı deneyin.
+    </div>
+    <button class="btn-secondary" style="width:100%; margin-top:8px;" onclick="doLogout()">Çıkış Yap</button>
+  </div>
+</div>
+
+<!-- ═══ REDDEDİLDİ EKRANI ═══ -->
+<div id="rejectedPage" style="display:none; min-height:100vh; background:var(--navy); align-items:center; justify-content:center; padding:40px;">
+  <div style="background:var(--white); border-radius:16px; padding:48px; max-width:460px; text-align:center; box-shadow:var(--shadow-lg);">
+    <div style="font-size:56px; margin-bottom:16px;">🚫</div>
+    <h2 style="font-family:'Playfair Display',serif; font-size:24px; color:var(--navy); margin-bottom:12px;">Başvuru Onaylanmadı</h2>
+    <p style="color:var(--gray); font-size:14px; line-height:1.6; margin-bottom:24px;">
+      Üyelik başvurunuz yönetim tarafından onaylanmamıştır. Sorularınız için meclis yönetimiyle iletişime geçebilirsiniz.
+    </p>
+    <button class="btn-secondary" style="width:100%;" onclick="doLogout()">Çıkış Yap</button>
+  </div>
+</div>
+
+<!-- ═══ ANA UYGULAMA ═══ -->
+<div id="app" style="display:none;">
   <aside class="sidebar">
     <div class="sidebar-logo">
       <div class="sidebar-logo-emblem">🏛️</div>
@@ -921,53 +1064,37 @@ tbody tr:last-child td { border-bottom: none; }
       <div class="sidebar-logo-sub">Yönetim Paneli</div>
     </div>
     <div class="sidebar-user">
-      <div class="user-avatar" id="sidebarAvatar">TY</div>
+      <div class="user-avatar" id="sidebarAvatar">?</div>
       <div>
-        <div class="user-info-name" id="sidebarName">Taha Yılmaz</div>
-        <div class="user-info-role" id="sidebarRole">Asbaşkan</div>
+        <div class="user-info-name" id="sidebarName">-</div>
+        <div class="user-info-role" id="sidebarRole">-</div>
       </div>
     </div>
     <nav class="sidebar-nav">
       <div class="nav-section-title">Ana Menü</div>
-      <div class="nav-item active" onclick="showPage('dashboard')">
-        <span class="nav-icon">📊</span> Özet
-      </div>
-      <div class="nav-item" onclick="showPage('meetings')">
-        <span class="nav-icon">📅</span> Takvim
-      </div>
-      <div class="nav-item" onclick="showPage('notes')">
-        <span class="nav-icon">📝</span> Tutanaklar
-      </div>
+      <div class="nav-item active" onclick="showPage('dashboard')"><span class="nav-icon">📊</span> Özet</div>
+      <div class="nav-item" onclick="showPage('meetings')"><span class="nav-icon">📅</span> Takvim</div>
+      <div class="nav-item" onclick="showPage('notes')"><span class="nav-icon">📝</span> Tutanaklar</div>
       <div class="nav-section-title">Meclis</div>
-      <div class="nav-item" onclick="showPage('members')">
-        <span class="nav-icon">👥</span> Üyeler
+      <div class="nav-item" onclick="showPage('members')"><span class="nav-icon">👥</span> Üyeler</div>
+      <div class="nav-item" onclick="showPage('announcements')"><span class="nav-icon">📢</span> Duyurular</div>
+      <div class="nav-item" onclick="showPage('magazine')"><span class="nav-icon">📖</span> Dergi</div>
+      <div class="nav-section-title admin-only" id="adminNavSection">Yönetim</div>
+      <div class="nav-item admin-only" onclick="showPage('approvals')">
+        <span class="nav-icon">✅</span> Üyelik Onayları
+        <span class="notif-dot" id="approvalBadge" style="display:none;">0</span>
       </div>
-      <div class="nav-item" onclick="showPage('announcements')">
-        <span class="nav-icon">📢</span> Duyurular
-      </div>
-      <div class="nav-item" onclick="showPage('magazine')">
-        <span class="nav-icon">📖</span> Dergi
-      </div>
-      <div class="nav-section-title" id="adminNavSection">Yönetim</div>
-      <div class="nav-item admin-only" onclick="showPage('pending')">
-        <span class="nav-icon">⏳</span> Yanıt Bekleyenler
-      </div>
-      <div class="nav-item admin-only" onclick="showPage('analytics')">
-        <span class="nav-icon">📈</span> Katılım Analizi
-      </div>
-      <div class="nav-item admin-only" onclick="showPage('admin')">
-        <span class="nav-icon">⚙️</span> Yönetim Paneli
-      </div>
+      <div class="nav-item admin-only" onclick="showPage('pending')"><span class="nav-icon">⏳</span> Yanıt Bekleyenler</div>
+      <div class="nav-item admin-only" onclick="showPage('analytics')"><span class="nav-icon">📈</span> Katılım Analizi</div>
+      <div class="nav-item admin-only" onclick="showPage('admin')"><span class="nav-icon">⚙️</span> Yönetim Paneli</div>
     </nav>
     <div class="sidebar-footer">
       <button class="btn-logout" onclick="doLogout()">🚪 Çıkış Yap</button>
     </div>
   </aside>
 
-  <!-- MAIN -->
   <main class="main-content">
-
-    <!-- ─── DASHBOARD ─── -->
+    <!-- DASHBOARD -->
     <div id="page-dashboard" class="page active">
       <div class="page-header">
         <div>
@@ -979,35 +1106,26 @@ tbody tr:last-child td { border-bottom: none; }
           <button class="btn-action editor-only" onclick="openModal('modalMeeting')">+ Toplantı</button>
         </div>
       </div>
-
-      <!-- Yaklaşan Toplantı Uyarı Banner -->
       <div id="meetingAlert" style="display:none; margin-bottom:24px;"></div>
-
       <div class="stats-grid">
         <div class="stat-card" data-icon="👥">
           <div class="stat-label">Toplam Üye</div>
-          <div class="stat-value" id="statMembers">12</div>
-          <div class="stat-sub">↑ Bu ay 2 yeni üye</div>
+          <div class="stat-value" id="statMembers">0</div>
         </div>
         <div class="stat-card" data-icon="📅" style="border-left-color: var(--gold)">
           <div class="stat-label">Toplantılar</div>
-          <div class="stat-value" id="statMeetings">8</div>
-          <div class="stat-sub">↑ Bu yıl</div>
+          <div class="stat-value" id="statMeetings">0</div>
         </div>
         <div class="stat-card" data-icon="📝" style="border-left-color: var(--green)">
           <div class="stat-label">Tutanaklar</div>
-          <div class="stat-value" id="statNotes">7</div>
-          <div class="stat-sub">↑ Son toplantı tamamlandı</div>
+          <div class="stat-value" id="statNotes">0</div>
         </div>
         <div class="stat-card" data-icon="📢" style="border-left-color: #8b5cf6">
           <div class="stat-label">Duyurular</div>
-          <div class="stat-value" id="statAnn">4</div>
-          <div class="stat-sub">2 aktif duyuru</div>
+          <div class="stat-value" id="statAnn">0</div>
         </div>
       </div>
-
       <div class="grid-2">
-        <!-- Yaklaşan Toplantılar -->
         <div class="card">
           <div class="card-header">
             <div class="card-title">Yaklaşan Toplantılar</div>
@@ -1015,8 +1133,6 @@ tbody tr:last-child td { border-bottom: none; }
           </div>
           <div class="card-body" id="dashMeetings"></div>
         </div>
-
-        <!-- Son Duyurular -->
         <div class="card">
           <div class="card-header">
             <div class="card-title">Son Duyurular</div>
@@ -1027,18 +1143,15 @@ tbody tr:last-child td { border-bottom: none; }
       </div>
     </div>
 
-    <!-- ─── MEETINGS / CALENDAR ─── -->
+    <!-- MEETINGS -->
     <div id="page-meetings" class="page">
       <div class="page-header">
         <div>
           <div class="page-title">Takvim</div>
           <div class="page-subtitle">Toplantı takvimini ve geçmiş toplantıları yönetin.</div>
         </div>
-        <div class="inline-flex">
-          <button class="btn-action editor-only" onclick="openModal('modalMeeting')">+ Yeni Toplantı</button>
-        </div>
+        <button class="btn-action editor-only" onclick="openModal('modalMeeting')">+ Yeni Toplantı</button>
       </div>
-
       <div class="grid-2" style="margin-bottom: 24px; align-items: start;">
         <div class="card">
           <div class="card-header"><div class="card-title">📅 Takvim</div></div>
@@ -1057,9 +1170,7 @@ tbody tr:last-child td { border-bottom: none; }
           </div>
         </div>
         <div class="card">
-          <div class="card-header">
-            <div class="card-title" id="selectedDayTitle">📅 Bir gün seçin</div>
-          </div>
+          <div class="card-header"><div class="card-title" id="selectedDayTitle">📅 Bir gün seçin</div></div>
           <div class="card-body" id="selectedDayMeetings" style="max-height: 460px; overflow-y:auto;">
             <div class="empty-state" style="padding:32px 16px;">
               <div class="empty-state-icon">👈</div>
@@ -1068,14 +1179,13 @@ tbody tr:last-child td { border-bottom: none; }
           </div>
         </div>
       </div>
-
       <div class="card">
         <div class="card-header"><div class="card-title">📋 Tüm Toplantılar</div></div>
         <div class="card-body" id="meetingList"></div>
       </div>
     </div>
 
-    <!-- ─── NOTES ─── -->
+    <!-- NOTES -->
     <div id="page-notes" class="page">
       <div class="page-header">
         <div>
@@ -1084,32 +1194,25 @@ tbody tr:last-child td { border-bottom: none; }
         </div>
         <button class="btn-action editor-only" onclick="openModal('modalNote')">+ Yeni Tutanak</button>
       </div>
-
       <div>
         <input class="search-input" style="width:280px; margin-bottom:16px;" placeholder="Tutanak ara..." oninput="filterNotes(this.value)">
         <div id="notesList"></div>
       </div>
     </div>
 
-    <!-- ─── MEMBERS ─── -->
+    <!-- MEMBERS -->
     <div id="page-members" class="page">
       <div class="page-header">
         <div>
           <div class="page-title">Üyeler</div>
           <div class="page-subtitle">Meclis üyelerini görüntüleyin.</div>
         </div>
-        <button class="btn-action admin-only" onclick="openModal('modalMember')">+ Üye Ekle</button>
       </div>
-
-      <div class="card" style="margin-bottom:20px;">
+      <div class="card">
         <div class="card-body">
           <div class="table-wrap">
             <table>
-              <thead>
-                <tr>
-                  <th>Üye</th><th>Rol</th><th>İletişim</th><th>Durum</th>
-                </tr>
-              </thead>
+              <thead><tr><th>Üye</th><th>Rol</th><th>İletişim</th><th>Durum</th></tr></thead>
               <tbody id="membersTable"></tbody>
             </table>
           </div>
@@ -1117,7 +1220,7 @@ tbody tr:last-child td { border-bottom: none; }
       </div>
     </div>
 
-    <!-- ─── ANNOUNCEMENTS ─── -->
+    <!-- ANNOUNCEMENTS -->
     <div id="page-announcements" class="page">
       <div class="page-header">
         <div>
@@ -1129,23 +1232,34 @@ tbody tr:last-child td { border-bottom: none; }
       <div id="announcementList"></div>
     </div>
 
-    <!-- ─── MAGAZINE ─── -->
+    <!-- MAGAZINE -->
     <div id="page-magazine" class="page">
       <div class="page-header">
         <div>
           <div class="page-title">📖 Aylık Dergi Arşivi</div>
           <div class="page-subtitle">Meclisimizin aylık olarak yayınladığı dergi sayıları.</div>
         </div>
+        <button class="btn-action editor-only" onclick="openModal('modalMagazine')">+ Yeni Sayı Yükle</button>
       </div>
-
-      <!-- Bu ayın dergisi (öne çıkan) -->
       <div id="featuredMagazine"></div>
-
-      <!-- Geçmiş sayılar -->
-      <div id="magazineArchive" style="display:none;"></div>
+      <div class="card" style="margin-top:24px;">
+        <div class="card-header"><div class="card-title">📚 Geçmiş Sayılar</div></div>
+        <div class="card-body"><div id="magazineArchive"></div></div>
+      </div>
     </div>
 
-    <!-- ─── PENDING RESPONSES (Admin Only) ─── -->
+    <!-- APPROVALS (Üyelik Onayları) -->
+    <div id="page-approvals" class="page">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Üyelik Onayları</div>
+          <div class="page-subtitle">Yeni üyelik başvurularını inceleyin ve onaylayın.</div>
+        </div>
+      </div>
+      <div id="approvalsContent"></div>
+    </div>
+
+    <!-- PENDING (Yanıt Bekleyenler) -->
     <div id="page-pending" class="page">
       <div class="page-header">
         <div>
@@ -1153,11 +1267,10 @@ tbody tr:last-child td { border-bottom: none; }
           <div class="page-subtitle">Yaklaşan toplantıya henüz yanıt vermemiş üyeler.</div>
         </div>
       </div>
-
       <div id="pendingContent"></div>
     </div>
 
-    <!-- ─── ANALYTICS ─── -->
+    <!-- ANALYTICS -->
     <div id="page-analytics" class="page">
       <div class="page-header">
         <div>
@@ -1165,17 +1278,14 @@ tbody tr:last-child td { border-bottom: none; }
           <div class="page-subtitle">Üyelerin toplantılara katılım istatistikleri.</div>
         </div>
       </div>
-
       <div class="stats-grid" style="grid-template-columns: repeat(3, 1fr);">
         <div class="stat-card" data-icon="📅">
           <div class="stat-label">Toplam Toplantı</div>
           <div class="stat-value" id="anStatTotal">0</div>
-          <div class="stat-sub">Düzenlenen toplantılar</div>
         </div>
         <div class="stat-card" data-icon="✅" style="border-left-color: var(--green)">
           <div class="stat-label">Ortalama Katılım</div>
           <div class="stat-value" id="anStatAvg">0%</div>
-          <div class="stat-sub">Tüm toplantılar</div>
         </div>
         <div class="stat-card" data-icon="🏆" style="border-left-color: var(--gold)">
           <div class="stat-label">En Aktif Üye</div>
@@ -1183,45 +1293,23 @@ tbody tr:last-child td { border-bottom: none; }
           <div class="stat-sub" id="anStatTopSub">-</div>
         </div>
       </div>
-
       <div class="card" style="margin-bottom:20px;">
-        <div class="card-header">
-          <div class="card-title">👥 Üye Bazlı Katılım Sıralaması</div>
-        </div>
+        <div class="card-header"><div class="card-title">👥 Üye Bazlı Katılım Sıralaması</div></div>
         <div class="card-body">
           <div class="table-wrap">
             <table>
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Üye</th>
-                  <th>Rol</th>
-                  <th>Katıldığı Toplantı</th>
-                  <th>Katılım Oranı</th>
-                  <th>Durum</th>
-                </tr>
-              </thead>
+              <thead><tr><th>#</th><th>Üye</th><th>Rol</th><th>Katıldığı</th><th>Katılım Oranı</th><th>Durum</th></tr></thead>
               <tbody id="analyticsTable"></tbody>
             </table>
           </div>
         </div>
       </div>
-
       <div class="card">
-        <div class="card-header">
-          <div class="card-title">📋 Toplantı Bazlı Katılım Detayı</div>
-        </div>
+        <div class="card-header"><div class="card-title">📋 Toplantı Bazlı Katılım Detayı</div></div>
         <div class="card-body">
           <div class="table-wrap">
             <table>
-              <thead>
-                <tr>
-                  <th>Toplantı</th>
-                  <th>Tarih</th>
-                  <th>Katılan</th>
-                  <th>Katılım Oranı</th>
-                </tr>
-              </thead>
+              <thead><tr><th>Toplantı</th><th>Tarih</th><th>Katılan</th><th>Katılım Oranı</th></tr></thead>
               <tbody id="meetingAttendanceTable"></tbody>
             </table>
           </div>
@@ -1229,70 +1317,41 @@ tbody tr:last-child td { border-bottom: none; }
       </div>
     </div>
 
-    <!-- ─── ADMIN ─── -->
+    <!-- ADMIN -->
     <div id="page-admin" class="page">
       <div class="page-header">
         <div>
           <div class="page-title">Yönetim Paneli</div>
-          <div class="page-subtitle">Sistem ayarları ve kullanıcı yönetimi.</div>
+          <div class="page-subtitle">Üye yönetimi ve sistem ayarları.</div>
         </div>
       </div>
-
       <div class="card" style="margin-bottom:20px;">
-        <div class="card-header">
-          <div class="card-title">👥 Üye Yönetimi</div>
-          <button class="btn-action" onclick="openModal('modalMember')">+ Üye Ekle</button>
-        </div>
+        <div class="card-header"><div class="card-title">👥 Üye Yönetimi</div></div>
         <div class="card-body">
           <div class="table-wrap">
             <table>
-              <thead>
-                <tr><th>Üye</th><th>Rol</th><th>E-posta</th><th>Telefon</th><th>Durum</th><th>İşlem</th></tr>
-              </thead>
+              <thead><tr><th>Üye</th><th>Rol</th><th>E-posta</th><th>Telefon</th><th>Durum</th><th>İşlem</th></tr></thead>
               <tbody id="adminMembersTable"></tbody>
             </table>
           </div>
         </div>
       </div>
-
-      <div class="grid-2">
-        <div class="card">
-          <div class="card-header"><div class="card-title">🔑 Kullanıcı Hesapları</div></div>
-          <div class="card-body">
-            <div class="table-wrap">
-              <table>
-                <thead><tr><th>Ad</th><th>E-posta</th><th>Rol</th></tr></thead>
-                <tbody id="adminUsersTable"></tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-        <div class="card">
-          <div class="card-header"><div class="card-title">📊 Sistem Durumu</div></div>
-          <div class="card-body">
-            <div style="display:flex; flex-direction:column; gap:12px;">
-              <div style="display:flex; justify-content:space-between; font-size:13px; padding:8px 0; border-bottom:1px solid var(--gray-light)">
-                <span>Toplam Üye</span><strong id="adStatM">12</strong>
-              </div>
-              <div style="display:flex; justify-content:space-between; font-size:13px; padding:8px 0; border-bottom:1px solid var(--gray-light)">
-                <span>Toplantı Sayısı</span><strong id="adStatT">8</strong>
-              </div>
-              <div style="display:flex; justify-content:space-between; font-size:13px; padding:8px 0; border-bottom:1px solid var(--gray-light)">
-                <span>Tutanak Sayısı</span><strong id="adStatN">7</strong>
-              </div>
-              <div style="display:flex; justify-content:space-between; font-size:13px; padding:8px 0;">
-                <span>Duyuru Sayısı</span><strong id="adStatA">4</strong>
-              </div>
-            </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title">📊 Sistem Durumu</div></div>
+        <div class="card-body">
+          <div style="display:flex; flex-direction:column; gap:12px;">
+            <div style="display:flex; justify-content:space-between; font-size:13px; padding:8px 0; border-bottom:1px solid var(--gray-light)"><span>Toplam Üye</span><strong id="adStatM">0</strong></div>
+            <div style="display:flex; justify-content:space-between; font-size:13px; padding:8px 0; border-bottom:1px solid var(--gray-light)"><span>Toplantı Sayısı</span><strong id="adStatT">0</strong></div>
+            <div style="display:flex; justify-content:space-between; font-size:13px; padding:8px 0; border-bottom:1px solid var(--gray-light)"><span>Tutanak Sayısı</span><strong id="adStatN">0</strong></div>
+            <div style="display:flex; justify-content:space-between; font-size:13px; padding:8px 0;"><span>Duyuru Sayısı</span><strong id="adStatA">0</strong></div>
           </div>
         </div>
       </div>
     </div>
-
   </main>
 </div>
 
-<!-- ═══ MODALS ═══ -->
+<!-- ═══ MODALLAR ═══ -->
 
 <!-- Toplantı Ekle -->
 <div class="modal-overlay" id="modalMeeting">
@@ -1305,18 +1364,14 @@ tbody tr:last-child td { border-bottom: none; }
       <div class="form-group"><label>Toplantı Başlığı</label><input type="text" id="mtgTitle" placeholder="Olağan Genel Kurul"></div>
       <div class="grid-2">
         <div class="form-group"><label>Tarih</label><input type="date" id="mtgDate"></div>
-        <div class="form-group"><label>Saat</label><input type="time" id="mtgTime" value="10:00"></div>
+        <div class="form-group"><label>Saat</label><input type="time" id="mtgTime" value="18:00"></div>
       </div>
-      <div class="form-group"><label>Yer</label><input type="text" id="mtgPlace" placeholder="Belediye Konferans Salonu"></div>
+      <div class="form-group"><label>Yer</label><input type="text" id="mtgPlace" placeholder="Çorlu Belediyesi Meclis Salonu" value="Çorlu Belediyesi Meclis Salonu"></div>
       <div class="form-group"><label>Gündem</label><textarea class="note-editor" id="mtgAgenda" placeholder="1. Açılış&#10;2. Gündem maddeleri&#10;3. Kapanış" style="min-height:100px;"></textarea></div>
-      <div class="form-group">
-        <label>Katılımcılar</label>
-        <div id="mtgAttendees"></div>
-      </div>
     </div>
     <div class="modal-footer">
       <button class="btn-secondary" onclick="closeModal('modalMeeting')">İptal</button>
-      <button class="btn-action" onclick="saveMeeting()">Kaydet</button>
+      <button class="btn-action" id="saveMeetingBtn" onclick="saveMeeting()">Kaydet</button>
     </div>
   </div>
 </div>
@@ -1331,53 +1386,18 @@ tbody tr:last-child td { border-bottom: none; }
     <div class="modal-body">
       <div class="form-group"><label>Başlık</label><input type="text" id="noteTitle" placeholder="Toplantı tutanağı..."></div>
       <div class="form-group"><label>Toplantı</label>
-        <select id="noteMeeting">
-          <option value="">-- Toplantı Seçin --</option>
-        </select>
+        <select id="noteMeeting"><option value="">-- Toplantı Seçin --</option></select>
       </div>
       <div class="form-group"><label>İçerik / Notlar</label>
         <textarea class="note-editor" id="noteBody" placeholder="Toplantıda alınan kararlar ve notlar buraya yazılır..."></textarea>
       </div>
       <div class="form-group"><label>Durum</label>
-        <select id="noteStatus">
-          <option value="taslak">Taslak</option>
-          <option value="onaylı">Onaylı</option>
-        </select>
+        <select id="noteStatus"><option value="taslak">Taslak</option><option value="onaylı">Onaylı</option></select>
       </div>
     </div>
     <div class="modal-footer">
       <button class="btn-secondary" onclick="closeModal('modalNote')">İptal</button>
-      <button class="btn-action" onclick="saveNote()">Kaydet</button>
-    </div>
-  </div>
-</div>
-
-<!-- Üye Ekle -->
-<div class="modal-overlay" id="modalMember">
-  <div class="modal">
-    <div class="modal-header">
-      <div class="modal-title">Yeni Üye Ekle</div>
-      <button class="modal-close" onclick="closeModal('modalMember')">✕</button>
-    </div>
-    <div class="modal-body">
-      <div class="grid-2">
-        <div class="form-group"><label>Ad</label><input type="text" id="memFirst" placeholder="Ad"></div>
-        <div class="form-group"><label>Soyad</label><input type="text" id="memLast" placeholder="Soyad"></div>
-      </div>
-      <div class="form-group"><label>E-posta</label><input type="email" id="memEmail" placeholder="ornek@meclis.gov.tr"></div>
-      <div class="form-group"><label>Telefon</label><input type="tel" id="memPhone" placeholder="0555 123 4567"></div>
-      <div class="form-group"><label>Rol</label>
-        <select id="memRole">
-          <option value="Üye">Üye</option>
-          <option value="Komisyon Sözcüsü">Komisyon Sözcüsü</option>
-          <option value="Başkan">Başkan</option>
-          <option value="Asbaşkan">Asbaşkan</option>
-        </select>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn-secondary" onclick="closeModal('modalMember')">İptal</button>
-      <button class="btn-action" onclick="saveMember()">Kaydet</button>
+      <button class="btn-action" id="saveNoteBtn" onclick="saveNote()">Kaydet</button>
     </div>
   </div>
 </div>
@@ -1395,112 +1415,15 @@ tbody tr:last-child td { border-bottom: none; }
         <textarea class="note-editor" id="annBody" placeholder="Duyuru metni..." style="min-height:120px;"></textarea>
       </div>
       <div class="form-group"><label>Önem</label>
-        <select id="annPriority">
-          <option value="normal">Normal</option>
-          <option value="önemli">Önemli</option>
-          <option value="acil">Acil</option>
-        </select>
+        <select id="annPriority"><option value="normal">Normal</option><option value="önemli">Önemli</option><option value="acil">Acil</option></select>
       </div>
     </div>
     <div class="modal-footer">
       <button class="btn-secondary" onclick="closeModal('modalAnnouncement')">İptal</button>
-      <button class="btn-action" onclick="saveAnnouncement()">Yayınla</button>
+      <button class="btn-action" id="saveAnnBtn" onclick="saveAnnouncement()">Yayınla</button>
     </div>
   </div>
 </div>
-
-<!-- Mazeret Bildir -->
-<div class="modal-overlay" id="modalExcuse">
-  <div class="modal">
-    <div class="modal-header">
-      <div class="modal-title">📝 Mazeret Bildir</div>
-      <button class="modal-close" onclick="closeModal('modalExcuse')">✕</button>
-    </div>
-    <div class="modal-body">
-      <div style="background:rgba(192,57,43,0.06); border-left:3px solid var(--red); padding:14px; border-radius:8px; margin-bottom:20px;">
-        <div style="font-size:13px; color:var(--navy); font-weight:600; margin-bottom:4px;" id="excuseMeetingTitle">-</div>
-        <div style="font-size:12px; color:var(--gray);" id="excuseMeetingDate">-</div>
-      </div>
-      <div class="form-group">
-        <label>Mazeretiniz</label>
-        <textarea class="note-editor" id="excuseText" placeholder="Toplantıya neden katılamayacağınızı yazınız..." style="min-height:120px;"></textarea>
-        <div style="font-size:11px; color:var(--gray); margin-top:6px;">⚠️ Mazeret bildirmek zorunludur. Asbaşkan ve Başkan tarafından görüntülenecektir.</div>
-      </div>
-      <input type="hidden" id="excuseMeetingId">
-    </div>
-    <div class="modal-footer">
-      <button class="btn-secondary" onclick="closeModal('modalExcuse')">İptal</button>
-      <button class="btn-action" style="background:linear-gradient(135deg, var(--red), #d35243);" onclick="saveExcuse()">Mazereti Gönder</button>
-    </div>
-  </div>
-</div>
-
-<!-- Mazeret Listesi (Admin) -->
-<div class="modal-overlay" id="modalExcuseList">
-  <div class="modal" style="max-width:680px;">
-    <div class="modal-header">
-      <div class="modal-title" id="excuseListTitle">Mazeret Listesi</div>
-      <button class="modal-close" onclick="closeModal('modalExcuseList')">✕</button>
-    </div>
-    <div class="modal-body" id="excuseListBody"></div>
-    <div class="modal-footer">
-      <button class="btn-secondary" onclick="closeModal('modalExcuseList')">Kapat</button>
-    </div>
-  </div>
-</div>
-
-<!-- Dergi Yükle -->
-<div class="modal-overlay" id="modalMagazine">
-  <div class="modal">
-    <div class="modal-header">
-      <div class="modal-title">📖 Yeni Dergi Sayısı Yükle</div>
-      <button class="modal-close" onclick="closeModal('modalMagazine')">✕</button>
-    </div>
-    <div class="modal-body">
-      <div class="grid-2">
-        <div class="form-group">
-          <label>Yıl</label>
-          <select id="magYear"></select>
-        </div>
-        <div class="form-group">
-          <label>Ay</label>
-          <select id="magMonth">
-            <option value="0">Ocak</option><option value="1">Şubat</option><option value="2">Mart</option>
-            <option value="3">Nisan</option><option value="4">Mayıs</option><option value="5">Haziran</option>
-            <option value="6">Temmuz</option><option value="7">Ağustos</option><option value="8">Eylül</option>
-            <option value="9">Ekim</option><option value="10">Kasım</option><option value="11">Aralık</option>
-          </select>
-        </div>
-      </div>
-      <div class="form-group">
-        <label>Sayı (opsiyonel)</label>
-        <input type="text" id="magIssue" placeholder="Örn: 12. Sayı">
-      </div>
-      <div class="form-group">
-        <label>Açıklama / Bu sayıda</label>
-        <textarea class="note-editor" id="magDesc" placeholder="Bu sayının kapak konusu ve içeriği hakkında kısa bilgi..." style="min-height:90px;"></textarea>
-      </div>
-      <div class="form-group">
-        <label>PDF Dosyası</label>
-        <input type="file" id="magPdfFile" accept="application/pdf" onchange="handleMagazineFile()">
-        <div style="font-size:11px; color:var(--gray); margin-top:6px;">⚠️ Maksimum dosya boyutu: 4 MB. Daha büyük dosyalar için sıkıştırılmış sürümünü yükleyin.</div>
-        <div id="magFilePreview" style="display:none; margin-top:10px; padding:10px 12px; background:var(--cream); border-radius:6px; font-size:12px;"></div>
-      </div>
-      <div class="form-group">
-        <label>Kapak Görseli (opsiyonel)</label>
-        <input type="file" id="magCoverFile" accept="image/*" onchange="handleCoverFile()">
-        <div id="magCoverPreview" style="display:none; margin-top:10px;"></div>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn-secondary" onclick="closeModal('modalMagazine')">İptal</button>
-      <button class="btn-action" onclick="saveMagazine()">Yayınla</button>
-    </div>
-  </div>
-</div>
-
-<!-- Toast -->
-<div class="toast" id="toast"></div>
 
 <!-- Tutanak Görüntüle -->
 <div class="modal-overlay" id="modalNoteView">
@@ -1530,11 +1453,11 @@ tbody tr:last-child td { border-bottom: none; }
     <div class="modal-body">
       <input type="hidden" id="editMemId">
       <div class="grid-2">
-        <div class="form-group"><label>Ad</label><input type="text" id="editMemFirst" placeholder="Ad"></div>
-        <div class="form-group"><label>Soyad</label><input type="text" id="editMemLast" placeholder="Soyad"></div>
+        <div class="form-group"><label>Ad</label><input type="text" id="editMemFirst"></div>
+        <div class="form-group"><label>Soyad</label><input type="text" id="editMemLast"></div>
       </div>
-      <div class="form-group"><label>E-posta</label><input type="email" id="editMemEmail" placeholder="ornek@meclis.gov.tr"></div>
-      <div class="form-group"><label>Telefon</label><input type="tel" id="editMemPhone" placeholder="0555 123 4567"></div>
+      <div class="form-group"><label>E-posta</label><input type="email" id="editMemEmail" disabled style="background:var(--gray-light);"></div>
+      <div class="form-group"><label>Telefon</label><input type="tel" id="editMemPhone"></div>
       <div class="form-group"><label>Rol</label>
         <select id="editMemRole">
           <option value="Üye">Üye</option>
@@ -1544,485 +1467,445 @@ tbody tr:last-child td { border-bottom: none; }
         </select>
       </div>
       <div class="form-group"><label>Durum</label>
-        <select id="editMemStatus">
-          <option value="aktif">Aktif</option>
-          <option value="pasif">Pasif</option>
-        </select>
+        <select id="editMemStatus"><option value="aktif">Aktif</option><option value="pasif">Pasif</option></select>
       </div>
     </div>
     <div class="modal-footer">
       <button class="btn-secondary" onclick="closeModal('modalEditMember')">İptal</button>
-      <button class="btn-action" onclick="saveEditMember()">Kaydet</button>
+      <button class="btn-action" id="saveEditMemBtn" onclick="saveEditMember()">Kaydet</button>
     </div>
   </div>
 </div>
 
-<script>
+<!-- Mazeret Bildir -->
+<div class="modal-overlay" id="modalExcuse">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">📝 Mazeret Bildir</div>
+      <button class="modal-close" onclick="closeModal('modalExcuse')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="info-box red">
+        <div style="font-weight:600; color:var(--navy); margin-bottom:2px;" id="excuseMeetingTitle">-</div>
+        <div id="excuseMeetingDate">-</div>
+      </div>
+      <div class="form-group">
+        <label>Mazeretiniz</label>
+        <textarea class="note-editor" id="excuseText" placeholder="Toplantıya neden katılamayacağınızı yazınız..." style="min-height:120px;"></textarea>
+        <div style="font-size:11px; color:var(--gray); margin-top:6px;">⚠️ Mazeret bildirmek zorunludur. Yönetim tarafından görüntülenecektir.</div>
+      </div>
+      <input type="hidden" id="excuseMeetingId">
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('modalExcuse')">İptal</button>
+      <button class="btn-action" style="background:linear-gradient(135deg, var(--red), #d35243);" id="saveExcuseBtn" onclick="saveExcuse()">Mazereti Gönder</button>
+    </div>
+  </div>
+</div>
+
+<!-- Dergi Yükle -->
+<div class="modal-overlay" id="modalMagazine">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">📖 Yeni Dergi Sayısı Yükle</div>
+      <button class="modal-close" onclick="closeModal('modalMagazine')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="grid-2">
+        <div class="form-group"><label>Yıl</label><select id="magYear"></select></div>
+        <div class="form-group"><label>Ay</label>
+          <select id="magMonth">
+            <option value="0">Ocak</option><option value="1">Şubat</option><option value="2">Mart</option>
+            <option value="3">Nisan</option><option value="4">Mayıs</option><option value="5">Haziran</option>
+            <option value="6">Temmuz</option><option value="7">Ağustos</option><option value="8">Eylül</option>
+            <option value="9">Ekim</option><option value="10">Kasım</option><option value="11">Aralık</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group"><label>Sayı (opsiyonel)</label><input type="text" id="magIssue" placeholder="Örn: 12. Sayı"></div>
+      <div class="form-group"><label>Açıklama</label>
+        <textarea class="note-editor" id="magDesc" placeholder="Bu sayının içeriği hakkında kısa bilgi..." style="min-height:80px;"></textarea>
+      </div>
+      <div class="form-group">
+        <label>PDF Dosyası</label>
+        <input type="file" id="magPdfFile" accept="application/pdf">
+        <div style="font-size:11px; color:var(--gray); margin-top:6px;">☁️ Firebase Storage'a yüklenir. Boyut sınırı yok.</div>
+      </div>
+      <div class="form-group">
+        <label>Kapak Görseli (opsiyonel)</label>
+        <input type="file" id="magCoverFile" accept="image/*">
+      </div>
+      <div id="magUploadProgress" style="display:none;"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('modalMagazine')">İptal</button>
+      <button class="btn-action" id="saveMagBtn" onclick="saveMagazine()">Yükle ve Yayınla</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script type="module">
 // ═══════════════════════════════════════════════
-// DATA STORE (localStorage)
+// FIREBASE BAŞLATMA
 // ═══════════════════════════════════════════════
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
+  signOut, onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {
+  getDatabase, ref, set, get, push, update, remove, onValue
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import {
+  getStorage, ref as sRef, uploadBytesResumable, getDownloadURL, deleteObject
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
 
-const USERS = [
-  { id: 1, email: 'asbaskan@meclis.gov.tr', password: '123456', name: 'Taha Yılmaz', role: 'Asbaşkan', initials: 'TY' },
-  { id: 2, email: 'baskan@meclis.gov.tr', password: '123456', name: 'Elif Kaya', role: 'Başkan', initials: 'EK' },
-  { id: 6, email: 'sozcu@meclis.gov.tr', password: '123456', name: 'Ayşe Şahin', role: 'Komisyon Sözcüsü', initials: 'AŞ' },
-  { id: 3, email: 'uye@meclis.gov.tr', password: '123456', name: 'Mert Demir', role: 'Üye', initials: 'MD' },
-];
+const firebaseConfig = {
+  apiKey: "AIzaSyD4-XrTMqDt9aWthtxOuAtk3WVxtRx-50Q",
+  authDomain: "genclik-meclisi.firebaseapp.com",
+  databaseURL: "https://genclik-meclisi-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "genclik-meclisi",
+  storageBucket: "genclik-meclisi.firebasestorage.app",
+  messagingSenderId: "87366204460",
+  appId: "1:87366204460:web:7536ee7f87fbbdd11b2589",
+  measurementId: "G-X560ZK0JKH"
+};
 
-let currentUser = null;
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getDatabase(app);
+const storage = getStorage(app);
 
-function getStore(key, def) {
-  try { return JSON.parse(localStorage.getItem(key)) || def; }
-  catch { return def; }
+// ═══════════════════════════════════════════════
+// GLOBAL DURUM
+// ═══════════════════════════════════════════════
+let currentUser = null;     // Firebase auth kullanıcısı
+let currentProfile = null;  // Database'deki üye profili
+let DATA = { members: {}, meetings: {}, notes: {}, announcements: {}, responses: {}, magazines: {} };
+
+const MONTHS_TR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+const DAYS_TR = ['Pzt','Sal','Çar','Per','Cum','Cmt','Paz'];
+
+// ═══════════════════════════════════════════════
+// YARDIMCI FONKSİYONLAR
+// ═══════════════════════════════════════════════
+function $(id) { return document.getElementById(id); }
+
+function isAdmin() { return currentProfile && ['Başkan','Asbaşkan'].includes(currentProfile.role); }
+function isEditor() { return currentProfile && ['Başkan','Asbaşkan','Komisyon Sözcüsü'].includes(currentProfile.role); }
+
+function showToast(msg, type = 'success') {
+  const t = $('toast');
+  t.textContent = msg;
+  t.className = `toast ${type} show`;
+  setTimeout(() => t.classList.remove('show'), 3500);
 }
-function setStore(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
 
-// Veri versiyonu: yeni özellik eklendiğinde artırılırsa eski veriyi sıfırlar
-const DATA_VERSION = 'v5';
-if (localStorage.getItem('gm_version') !== DATA_VERSION) {
-  localStorage.removeItem('gm_data');
-  localStorage.setItem('gm_version', DATA_VERSION);
+function formatDate(ds) {
+  if (!ds) return '';
+  const d = new Date(ds);
+  return `${d.getDate()} ${MONTHS_TR[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-function getData() {
-  const def = {
-    members: [
-      { id: 1, name: 'Elif Kaya', email: 'baskan@meclis.gov.tr', phone: '0532 111 1111', role: 'Başkan', status: 'aktif' },
-      { id: 2, name: 'Taha Yılmaz', email: 'asbaskan@meclis.gov.tr', phone: '0533 222 2222', role: 'Asbaşkan', status: 'aktif' },
-      { id: 6, name: 'Ayşe Şahin', email: 'sozcu@meclis.gov.tr', phone: '0537 666 6666', role: 'Komisyon Sözcüsü', status: 'aktif' },
-      { id: 3, name: 'Mert Demir', email: 'uye@meclis.gov.tr', phone: '0534 333 3333', role: 'Üye', status: 'aktif' },
-      { id: 4, name: 'Selin Çelik', email: 's.celik@meclis.gov.tr', phone: '0535 444 4444', role: 'Üye', status: 'aktif' },
-      { id: 5, name: 'Berk Aydın', email: 'b.aydin@meclis.gov.tr', phone: '0536 555 5555', role: 'Üye', status: 'aktif' },
-    ],
-    meetings: [
-      { id: 1, title: 'Şubat Olağan Toplantısı', date: '2026-02-25', time: '10:00', place: 'Belediye Konferans Salonu', agenda: '1. Açılış\n2. Proje değerlendirme\n3. Kapanış', attendees: [1,2,6,3,4,5] },
-      { id: 2, title: 'Proje Değerlendirme Toplantısı', date: '2026-03-05', time: '14:00', place: 'Toplantı Odası A', agenda: '1. Proje sunumları\n2. Bütçe görüşmesi\n3. Kararlar', attendees: [1,2,6,3] },
-      { id: 3, title: 'Ocak Olağan Toplantısı', date: '2026-01-15', time: '10:00', place: 'Belediye Konferans Salonu', agenda: '1. Açılış\n2. 2025 değerlendirme\n3. 2026 planı', attendees: [1,2,3,4,5] },
-      { id: 4, title: 'Aralık Toplantısı', date: '2025-12-10', time: '10:00', place: 'Belediye Konferans Salonu', agenda: '1. Yıl sonu değerlendirme', attendees: [1,2,6,3,5] },
-      { id: 5, title: 'Kasım Olağan Toplantısı', date: '2025-11-20', time: '10:00', place: 'Toplantı Odası B', agenda: '1. Komisyon raporları', attendees: [1,2,6,4,5] },
-    ],
-    notes: [
-      { id: 1, title: 'Ocak Toplantısı Tutanağı', meetingId: 3, body: 'TOPLANTI TUTANAĞI\n\nTarih: 15 Ocak 2026\nYer: Belediye Konferans Salonu\n\nKatılanlar: Elif Kaya, Taha Yılmaz, Mert Demir, Selin Çelik, Berk Aydın\n\nALINAN KARARLAR:\n1. 2025 yılı faaliyetleri değerlendirildi.\n2. 2026 yılı faaliyet planı hazırlanacak.\n3. Bir sonraki toplantı Şubat ayında yapılacak.\n\nKarar oy birliğiyle alındı.', status: 'onaylı', author: 'Taha Yılmaz', date: '2026-01-15' },
-      { id: 2, title: 'Şubat Toplantısı Taslak', meetingId: 1, body: 'Şubat toplantısı notları...', status: 'taslak', author: 'Taha Yılmaz', date: '2026-02-25' },
-    ],
-    announcements: [
-      { id: 1, title: 'Şubat Toplantısı Hakkında', body: '25 Şubat 2026 tarihinde yapılacak olağan toplantımıza tüm üyelerimizin katılması beklenmektedir.', priority: 'önemli', author: 'Elif Kaya', date: '2026-02-18' },
-      { id: 2, title: 'Yeni Üye Başvuruları Açıldı', body: '2026 yılı meclis üyeliği başvuruları başlamıştır. Son başvuru tarihi 28 Şubat 2026.', priority: 'normal', author: 'Taha Yılmaz', date: '2026-02-10' },
-      { id: 3, title: 'Web Sistemi Devreye Alındı', body: 'Gençlik Meclisi yönetim sistemimiz artık aktif. Tüm üyelerimizi sisteme kaydolmaya davet ediyoruz.', priority: 'normal', author: 'Taha Yılmaz', date: '2026-02-20' },
-    ],
-    responses: [],  // { meetingId, userId, userName, status, excuse, date }
-    magazines: []   // { id, year, month, issue, desc, fileName, fileSize, cover, uploadedBy, uploadDate }
+function roleBadge(role) {
+  if (role === 'Başkan') return 'badge-gold';
+  if (role === 'Asbaşkan') return 'badge-navy';
+  if (role === 'Komisyon Sözcüsü') return 'badge-purple';
+  return 'badge-gray';
+}
+
+function initials(name) {
+  return (name || '?').split(' ').map(x => x[0]).slice(0,2).join('').toUpperCase();
+}
+
+// Obje → dizi (Firebase key'leri ile)
+function toArray(obj) {
+  if (!obj) return [];
+  return Object.keys(obj).map(k => ({ ...obj[k], _key: k }));
+}
+
+// Firebase hata mesajlarını Türkçeleştir
+function trError(code) {
+  const map = {
+    'auth/email-already-in-use': 'Bu e-posta adresi zaten kayıtlı.',
+    'auth/invalid-email': 'Geçersiz e-posta adresi.',
+    'auth/weak-password': 'Şifre en az 6 karakter olmalıdır.',
+    'auth/user-not-found': 'Bu e-posta ile kayıtlı hesap bulunamadı.',
+    'auth/wrong-password': 'Hatalı şifre.',
+    'auth/invalid-credential': 'E-posta veya şifre hatalı.',
+    'auth/too-many-requests': 'Çok fazla deneme. Lütfen biraz bekleyin.',
+    'auth/network-request-failed': 'İnternet bağlantısı hatası.'
   };
-  return getStore('gm_data', def);
+  return map[code] || 'Bir hata oluştu. Lütfen tekrar deneyin.';
 }
 
-// PDF dosyaları ayrı saklanır (ana data'yı şişirmemek için)
-function getMagazineFile(id) {
-  return localStorage.getItem('gm_mag_' + id);
+function showError(elId, msg) {
+  $(elId).innerHTML = `<div class="info-box red" style="margin-top:14px; margin-bottom:0;">⚠️ ${msg}</div>`;
 }
-function setMagazineFile(id, dataUrl) {
-  try {
-    localStorage.setItem('gm_mag_' + id, dataUrl);
-    return true;
-  } catch (e) {
-    return false;
+function clearError(elId) { $(elId).innerHTML = ''; }
+
+// ═══════════════════════════════════════════════
+// SAYFA DURUMU KONTROL (Auth State)
+// ═══════════════════════════════════════════════
+function showScreen(screen) {
+  ['fullLoader','loginPage','pendingPage','rejectedPage','app'].forEach(id => {
+    $(id).style.display = 'none';
+  });
+  if (screen === 'login') $('loginPage').style.display = 'flex';
+  else if (screen === 'pending') $('pendingPage').style.display = 'flex';
+  else if (screen === 'rejected') $('rejectedPage').style.display = 'flex';
+  else if (screen === 'app') $('app').style.display = 'flex';
+  else $('fullLoader').style.display = 'flex';
+}
+
+onAuthStateChanged(auth, async (user) => {
+  if (!user) {
+    currentUser = null;
+    currentProfile = null;
+    showScreen('login');
+    return;
   }
-}
-function deleteMagazineFile(id) {
-  localStorage.removeItem('gm_mag_' + id);
-}
-
-function saveData(d) { setStore('gm_data', d); }
-
-// ═══════════════════════════════════════════════
-// AUTH
-// ═══════════════════════════════════════════════
-
-function isAdmin() { return currentUser && ['Başkan','Asbaşkan'].includes(currentUser.role); }
-function isEditor() { return currentUser && ['Başkan','Asbaşkan','Komisyon Sözcüsü'].includes(currentUser.role); }
-
-function doLogin() {
-  const email = document.getElementById('loginEmail').value.trim();
-  const pass = document.getElementById('loginPassword').value;
-  const user = USERS.find(u => u.email === email && u.password === pass);
-  if (!user) { showToast('Hatalı e-posta veya şifre!', 'error'); return; }
   currentUser = user;
-  document.getElementById('loginPage').style.display = 'none';
-  document.getElementById('app').style.display = 'flex';
-  document.getElementById('sidebarAvatar').textContent = user.initials;
-  document.getElementById('sidebarName').textContent = user.name;
-  document.getElementById('sidebarRole').textContent = user.role;
-  document.getElementById('dashWelcome').textContent = `Hoş geldiniz, ${user.name}. Aşağıda meclisinizin özeti bulunmaktadır.`;
+  showScreen('loader');
 
-  // Admin-only: Sadece Başkan/Asbaşkan (üye yönetimi, rol değiştirme)
-  document.querySelectorAll('.admin-only').forEach(el => el.style.display = isAdmin() ? '' : 'none');
-  // Editor-only: Başkan/Asbaşkan/Komisyon Sözcüsü (toplantı, tutanak, duyuru ekleme)
-  document.querySelectorAll('.editor-only').forEach(el => el.style.display = isEditor() ? '' : 'none');
-  document.getElementById('adminNavSection').style.display = isAdmin() ? 'block' : 'none';
+  // Profili veritabanından çek
+  try {
+    const snap = await get(ref(db, 'members/' + user.uid));
+    if (!snap.exists()) {
+      // Profil yok — anormal durum, çıkış yaptır
+      await signOut(auth);
+      showScreen('login');
+      showToast('Hesap bilgisi bulunamadı.', 'error');
+      return;
+    }
+    currentProfile = { ...snap.val(), _key: user.uid };
 
-  renderAll();
+    if (currentProfile.status === 'beklemede') {
+      $('pendingEmail').textContent = currentProfile.email;
+      showScreen('pending');
+    } else if (currentProfile.status === 'reddedildi') {
+      showScreen('rejected');
+    } else {
+      // Onaylı — uygulamaya gir
+      enterApp();
+    }
+  } catch (e) {
+    console.error(e);
+    showToast('Bağlantı hatası: ' + e.message, 'error');
+    showScreen('login');
+  }
+});
+
+// ═══════════════════════════════════════════════
+// KAYIT (Üyelik Başvurusu)
+// ═══════════════════════════════════════════════
+window.switchAuthTab = function(tab) {
+  $('tabLogin').classList.toggle('active', tab === 'login');
+  $('tabRegister').classList.toggle('active', tab === 'register');
+  $('formLogin').classList.toggle('active', tab === 'login');
+  $('formRegister').classList.toggle('active', tab === 'register');
+  clearError('loginError');
+  clearError('registerError');
+};
+
+window.doRegister = async function() {
+  clearError('registerError');
+  const first = $('regFirst').value.trim();
+  const last = $('regLast').value.trim();
+  const email = $('regEmail').value.trim();
+  const phone = $('regPhone').value.trim();
+  const pass = $('regPassword').value;
+  const pass2 = $('regPassword2').value;
+
+  if (!first || !last) { showError('registerError', 'Ad ve soyad zorunludur.'); return; }
+  if (!email) { showError('registerError', 'E-posta zorunludur.'); return; }
+  if (!phone) { showError('registerError', 'Telefon zorunludur.'); return; }
+  if (pass.length < 6) { showError('registerError', 'Şifre en az 6 karakter olmalıdır.'); return; }
+  if (pass !== pass2) { showError('registerError', 'Şifreler eşleşmiyor.'); return; }
+
+  const btn = $('registerBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Kaydediliyor...';
+
+  try {
+    // İlk kullanıcı mı? (Veritabanı boşsa ilk kişi otomatik Asbaşkan + onaylı olur)
+    const membersSnap = await get(ref(db, 'members'));
+    const isFirstUser = !membersSnap.exists();
+
+    // Firebase Auth hesabı oluştur
+    const cred = await createUserWithEmailAndPassword(auth, email, pass);
+    const uid = cred.user.uid;
+
+    // Veritabanına profil yaz
+    const profile = {
+      name: `${first} ${last}`,
+      email: email,
+      phone: phone,
+      role: isFirstUser ? 'Asbaşkan' : 'Üye',
+      status: isFirstUser ? 'aktif' : 'beklemede',
+      joinDate: new Date().toISOString().split('T')[0]
+    };
+    await set(ref(db, 'members/' + uid), profile);
+
+    if (isFirstUser) {
+      showToast('İlk hesap oluşturuldu — Asbaşkan yetkisiyle giriş yapıldı!', 'success');
+      // onAuthStateChanged otomatik devralacak
+    } else {
+      showToast('Başvurunuz alındı! Onay bekleniyor.', 'success');
+      // pending ekranı otomatik gösterilecek
+    }
+  } catch (e) {
+    console.error(e);
+    showError('registerError', trError(e.code));
+    btn.disabled = false;
+    btn.innerHTML = 'Başvuru Gönder';
+  }
+};
+
+// ═══════════════════════════════════════════════
+// GİRİŞ
+// ═══════════════════════════════════════════════
+window.doLogin = async function() {
+  clearError('loginError');
+  const email = $('loginEmail').value.trim();
+  const pass = $('loginPassword').value;
+  if (!email || !pass) { showError('loginError', 'E-posta ve şifre giriniz.'); return; }
+
+  const btn = $('loginBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Giriş yapılıyor...';
+
+  try {
+    await signInWithEmailAndPassword(auth, email, pass);
+    // onAuthStateChanged devralacak
+  } catch (e) {
+    console.error(e);
+    showError('loginError', trError(e.code));
+    btn.disabled = false;
+    btn.innerHTML = 'Giriş Yap';
+  }
+};
+
+window.doLogout = async function() {
+  await signOut(auth);
+  // Form butonlarını sıfırla
+  const lb = $('loginBtn'); lb.disabled = false; lb.innerHTML = 'Giriş Yap';
+  const rb = $('registerBtn'); rb.disabled = false; rb.innerHTML = 'Başvuru Gönder';
+  $('loginEmail').value = ''; $('loginPassword').value = '';
+};
+
+// ═══════════════════════════════════════════════
+// UYGULAMAYA GİRİŞ
+// ═══════════════════════════════════════════════
+function enterApp() {
+  showScreen('app');
+  $('sidebarAvatar').textContent = initials(currentProfile.name);
+  $('sidebarName').textContent = currentProfile.name;
+  $('sidebarRole').textContent = currentProfile.role;
+  $('dashWelcome').textContent = `Hoş geldiniz, ${currentProfile.name}.`;
+
+  // Yetki görünürlüğü
+  document.querySelectorAll('.admin-only').forEach(el => el.style.display = isAdmin() ? (el.classList.contains('nav-section-title') ? 'block' : (el.tagName === 'BUTTON' ? 'inline-block' : 'flex')) : 'none');
+  document.querySelectorAll('.editor-only').forEach(el => el.style.display = isEditor() ? (el.tagName === 'BUTTON' ? 'inline-block' : 'flex') : 'none');
+
+  // Gerçek zamanlı veri dinleyicileri başlat
+  startDataListeners();
   showPage('dashboard');
-  showToast(`Hoş geldiniz, ${user.name}!`, 'success');
-}
-
-function doLogout() {
-  currentUser = null;
-  document.getElementById('app').style.display = 'none';
-  document.getElementById('loginPage').style.display = 'flex';
 }
 
 // ═══════════════════════════════════════════════
-// NAVIGATION
+// GERÇEK ZAMANLI VERİ SENKRONİZASYONU
 // ═══════════════════════════════════════════════
+function startDataListeners() {
+  onValue(ref(db, 'members'), snap => {
+    DATA.members = snap.val() || {};
+    renderAll();
+    // Kendi profilimizi güncelle (rol değişmiş olabilir)
+    if (currentUser && DATA.members[currentUser.uid]) {
+      const fresh = DATA.members[currentUser.uid];
+      if (fresh.status === 'reddedildi') { showScreen('rejected'); return; }
+      if (fresh.status === 'beklemede') { showScreen('pending'); return; }
+      currentProfile = { ...fresh, _key: currentUser.uid };
+      $('sidebarRole').textContent = currentProfile.role;
+      document.querySelectorAll('.admin-only').forEach(el => el.style.display = isAdmin() ? (el.classList.contains('nav-section-title') ? 'block' : (el.tagName === 'BUTTON' ? 'inline-block' : 'flex')) : 'none');
+      document.querySelectorAll('.editor-only').forEach(el => el.style.display = isEditor() ? (el.tagName === 'BUTTON' ? 'inline-block' : 'flex') : 'none');
+    }
+  });
+  onValue(ref(db, 'meetings'), snap => { DATA.meetings = snap.val() || {}; renderAll(); });
+  onValue(ref(db, 'notes'), snap => { DATA.notes = snap.val() || {}; renderAll(); });
+  onValue(ref(db, 'announcements'), snap => { DATA.announcements = snap.val() || {}; renderAll(); });
+  onValue(ref(db, 'responses'), snap => { DATA.responses = snap.val() || {}; renderAll(); });
+  onValue(ref(db, 'magazines'), snap => { DATA.magazines = snap.val() || {}; renderMagazine(); });
+}
 
-function showPage(p) {
+// ═══════════════════════════════════════════════
+// NAVİGASYON
+// ═══════════════════════════════════════════════
+window.showPage = function(p) {
   document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-  document.getElementById('page-' + p).classList.add('active');
-  const items = document.querySelectorAll('.nav-item');
-  items.forEach(item => { if (item.getAttribute('onclick').includes(`'${p}'`)) item.classList.add('active'); });
+  $('page-' + p).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(item => {
+    const oc = item.getAttribute('onclick') || '';
+    if (oc.includes(`'${p}'`)) item.classList.add('active');
+  });
   if (p === 'meetings') renderCalendar();
   if (p === 'admin') renderAdmin();
   if (p === 'analytics') renderAnalytics();
   if (p === 'pending') renderPending();
+  if (p === 'approvals') renderApprovals();
   if (p === 'magazine') renderMagazine();
-}
+};
 
 // ═══════════════════════════════════════════════
-// MEETING ALERT — Her ayın 2. cuması toplantı
-// 1 hafta kala (ayın 1. cuması) uyarı çıkar
+// ANA RENDER
 // ═══════════════════════════════════════════════
-
-function getSecondFriday(year, month) {
-  // month: 0-11
-  const first = new Date(year, month, 1);
-  const firstDay = first.getDay(); // 0=Paz, 5=Cuma
-  let firstFridayDate = (5 - firstDay + 7) % 7 + 1;
-  return new Date(year, month, firstFridayDate + 7);
-}
-
-function getFirstFriday(year, month) {
-  const first = new Date(year, month, 1);
-  const firstDay = first.getDay();
-  let firstFridayDate = (5 - firstDay + 7) % 7 + 1;
-  return new Date(year, month, firstFridayDate);
-}
-
-function dateToStr(d) {
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-}
-
-function getNextMeetingAlert() {
-  // Bugün hangi ayda? Bu ayın 2. cuması geçti mi?
-  const now = new Date();
-  let year = now.getFullYear();
-  let month = now.getMonth();
-  let secondFri = getSecondFriday(year, month);
-  let firstFri = getFirstFriday(year, month);
-
-  // ── ÖZEL DURUM: Mayıs 2026 — Çorlu Belediye Meclisi sunumu nedeniyle uzatma ──
-  // Normalde toplantı günü (8 Mayıs Cuma) sonrası uyarı kapanır,
-  // ancak bu sefer 9 Mayıs sonuna kadar görünür kalsın.
-  const extendedEnd_2026_05 = new Date(2026, 4, 9, 23, 59, 59); // 9 Mayıs 2026 23:59
-  if (year === 2026 && month === 4 && now <= extendedEnd_2026_05) {
-    return {
-      showAlert: true,
-      meetingDate: secondFri,
-      meetingDateStr: dateToStr(secondFri),
-      daysUntil: Math.ceil((secondFri - now) / (1000 * 60 * 60 * 24))
-    };
-  }
-
-  // Bu ayın 2. cuması geçtiyse, sonraki aya bakalım
-  if (now > secondFri) {
-    month++;
-    if (month > 11) { month = 0; year++; }
-    secondFri = getSecondFriday(year, month);
-    firstFri = getFirstFriday(year, month);
-  }
-
-  // Uyarı: 1. cumadan 2. cumaya kadar göster
-  // Yani "şimdi" 1. cumadan büyükse VE 2. cumadan küçükse uyarı aktif
-  const showAlert = now >= firstFri && now <= secondFri;
-
-  return {
-    showAlert,
-    meetingDate: secondFri,
-    meetingDateStr: dateToStr(secondFri),
-    daysUntil: Math.ceil((secondFri - now) / (1000 * 60 * 60 * 24))
-  };
-}
-
-function ensureScheduledMeeting(meetingDateStr) {
-  // 2. cuma toplantısını otomatik takvime ekle (yoksa)
-  const d = getData();
-  const existing = d.meetings.find(m => m.date === meetingDateStr && m.scheduled);
-  if (existing) return existing;
-
-  const meeting = {
-    id: Date.now() + Math.random(),
-    title: 'Aylık Olağan Toplantı',
-    date: meetingDateStr,
-    time: '18:00',
-    place: 'Çorlu Belediyesi Meclis Salonu',
-    agenda: '1. Açılış\n2. Önceki tutanağın okunması\n3. Komisyon raporları\n4. Gündem maddeleri\n5. Dilek ve temenniler\n6. Kapanış',
-    attendees: d.members.map(m => m.id),
-    scheduled: true  // otomatik oluşturulan toplantı
-  };
-  d.meetings.push(meeting);
-  saveData(d);
-  return meeting;
-}
-
-function getUserResponse(meetingId, userId) {
-  const d = getData();
-  return (d.responses || []).find(r => r.meetingId === meetingId && r.userId === userId);
-}
-
-function setUserResponse(meetingId, status, excuse) {
-  const d = getData();
-  d.responses = d.responses || [];
-  const existing = d.responses.findIndex(r => r.meetingId === meetingId && r.userId === currentUser.id);
-  const record = {
-    meetingId,
-    userId: currentUser.id,
-    userName: currentUser.name,
-    status,
-    excuse: excuse || '',
-    date: new Date().toISOString()
-  };
-  if (existing > -1) d.responses[existing] = record;
-  else d.responses.push(record);
-  saveData(d);
-}
-
-function renderMeetingAlert() {
-  const alert = getNextMeetingAlert();
-  const banner = document.getElementById('meetingAlert');
-  if (!alert.showAlert || !currentUser) {
-    banner.style.display = 'none';
-    return;
-  }
-
-  // Toplantıyı takvime ekle (yoksa)
-  const meeting = ensureScheduledMeeting(alert.meetingDateStr);
-  const response = getUserResponse(meeting.id, currentUser.id);
-
-  const dateStr = `${alert.meetingDate.getDate()} ${MONTHS_TR[alert.meetingDate.getMonth()]} ${alert.meetingDate.getFullYear()} Cuma`;
-  const daysText = alert.daysUntil === 0 ? 'BUGÜN' : alert.daysUntil === 1 ? 'YARIN' : `${alert.daysUntil} GÜN SONRA`;
-
-  // Admin için: yanıt veren kişi sayıları
-  const d = getData();
-  const responses = (d.responses || []).filter(r => r.meetingId === meeting.id);
-  const yesCount = responses.filter(r => r.status === 'katılıyor').length;
-  const noCount = responses.filter(r => r.status === 'katılmıyor').length;
-  const totalMembers = d.members.length;
-  const pendingCount = totalMembers - responses.length;
-
-  let responseHTML = '';
-  if (response) {
-    if (response.status === 'katılıyor') {
-      responseHTML = `
-        <div style="background:rgba(30,122,92,0.12); padding:14px 18px; border-radius:10px; display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:16px;">
-          <div style="font-size:13px; color:var(--green); font-weight:600;">
-            ✅ Toplantıya katılacağınızı bildirdiniz.
-          </div>
-          <button class="btn-secondary" style="padding:6px 14px; font-size:11px;" onclick="changeResponse(${meeting.id})">Yanıtı Değiştir</button>
-        </div>`;
-    } else {
-      responseHTML = `
-        <div style="background:rgba(192,57,43,0.08); padding:14px 18px; border-radius:10px; margin-top:16px;">
-          <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:8px;">
-            <div style="font-size:13px; color:var(--red); font-weight:600;">
-              ❌ Mazeret bildirildi.
-            </div>
-            <button class="btn-secondary" style="padding:6px 14px; font-size:11px;" onclick="changeResponse(${meeting.id})">Yanıtı Değiştir</button>
-          </div>
-          <div style="font-size:12px; color:var(--navy); padding:8px 12px; background:var(--white); border-radius:6px; margin-top:8px; white-space:pre-wrap;">"${response.excuse}"</div>
-        </div>`;
-    }
-  } else {
-    responseHTML = `
-      <div style="display:flex; gap:10px; margin-top:18px; flex-wrap:wrap;">
-        <button class="btn-action" style="background:linear-gradient(135deg, var(--green), #2a9b75); flex:1; min-width:160px;" onclick="respondMeeting(${meeting.id}, 'katılıyor')">
-          ✅ Katılacağım
-        </button>
-        <button class="btn-action" style="background:linear-gradient(135deg, var(--red), #d35243); flex:1; min-width:160px;" onclick="respondMeeting(${meeting.id}, 'katılmıyor')">
-          ❌ Katılamayacağım
-        </button>
-      </div>`;
-  }
-
-  // Admin için özet ve liste butonu
-  let adminSummary = '';
-  if (isAdmin()) {
-    adminSummary = `
-      <div style="display:flex; gap:8px; margin-top:14px; flex-wrap:wrap; padding-top:14px; border-top:1px solid rgba(255,255,255,0.1); align-items:center;">
-        <span class="badge badge-green">✅ Katılacak: ${yesCount}</span>
-        <span class="badge badge-red">❌ Mazeret: ${noCount}</span>
-        <span class="badge badge-gray">⏳ Yanıt bekleyen: ${pendingCount}</span>
-        <button class="btn-secondary" style="padding:5px 12px; font-size:11px; margin-left:auto;" onclick="showPage('pending')">Detayları Gör →</button>
-      </div>`;
-  }
-
-  banner.innerHTML = `
-    <div style="background:linear-gradient(135deg, var(--navy), var(--navy-light)); border-radius:14px; padding:24px 28px; color:var(--white); position:relative; overflow:hidden; box-shadow:var(--shadow-lg);">
-      <div style="position:absolute; top:-40px; right:-40px; width:180px; height:180px; background:radial-gradient(circle, rgba(200,168,75,0.2) 0%, transparent 70%); border-radius:50%;"></div>
-      <div style="position:relative; z-index:1;">
-        <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
-          <span class="badge badge-gold" style="padding:5px 12px; font-size:11px;">⏰ ${daysText}</span>
-          <span style="font-size:11px; letter-spacing:2px; color:var(--gold); text-transform:uppercase;">Yaklaşan Toplantı</span>
-        </div>
-        <div style="font-family:'Playfair Display', serif; font-size:22px; font-weight:600; margin-bottom:6px;">Aylık Olağan Toplantı</div>
-        <div style="font-size:14px; color:rgba(255,255,255,0.85);">📅 ${dateStr} &nbsp;·&nbsp; 🕐 ${meeting.time} &nbsp;·&nbsp; 📍 ${meeting.place}</div>
-        ${responseHTML}
-        ${adminSummary}
-      </div>
-    </div>`;
-  banner.style.display = 'block';
-}
-
-function respondMeeting(meetingId, status) {
-  if (status === 'katılıyor') {
-    setUserResponse(meetingId, 'katılıyor');
-    showToast('✅ Katılım kaydedildi!', 'success');
-    renderMeetingAlert();
-  } else {
-    // Mazeret formunu aç
-    const d = getData();
-    const meeting = d.meetings.find(m => m.id === meetingId);
-    if (!meeting) return;
-    document.getElementById('excuseMeetingId').value = meetingId;
-    document.getElementById('excuseMeetingTitle').textContent = meeting.title;
-    document.getElementById('excuseMeetingDate').textContent = `📅 ${formatDate(meeting.date)} · 🕐 ${meeting.time}`;
-    document.getElementById('excuseText').value = '';
-    openModal('modalExcuse');
-  }
-}
-
-function saveExcuse() {
-  const meetingId = parseFloat(document.getElementById('excuseMeetingId').value);
-  const excuse = document.getElementById('excuseText').value.trim();
-  if (!excuse || excuse.length < 10) {
-    showToast('Lütfen en az 10 karakter mazeret yazınız.', 'error');
-    return;
-  }
-  setUserResponse(meetingId, 'katılmıyor', excuse);
-  closeModal('modalExcuse');
-  showToast('Mazeretiniz iletildi.', 'success');
-  renderMeetingAlert();
-}
-
-function changeResponse(meetingId) {
-  if (!confirm('Yanıtınızı değiştirmek istediğinize emin misiniz?')) return;
-  const d = getData();
-  d.responses = (d.responses || []).filter(r => !(r.meetingId === meetingId && r.userId === currentUser.id));
-  saveData(d);
-  renderMeetingAlert();
-}
-
-function openExcuseList(meetingId) {
-  const d = getData();
-  const meeting = d.meetings.find(m => m.id === meetingId);
-  const responses = (d.responses || []).filter(r => r.meetingId === meetingId);
-  const respondedIds = responses.map(r => r.userId);
-  const pending = d.members.filter(m => !respondedIds.includes(m.id));
-
-  const yesResponses = responses.filter(r => r.status === 'katılıyor');
-  const noResponses = responses.filter(r => r.status === 'katılmıyor');
-
-  document.getElementById('excuseListTitle').textContent = `${meeting ? meeting.title : 'Toplantı'} — Yanıtlar`;
-
-  let html = '';
-
-  // Mazeret bildirenler
-  html += `<div style="margin-bottom:24px;">
-    <div style="font-size:13px; font-weight:600; color:var(--red); margin-bottom:12px; padding-bottom:8px; border-bottom:1px solid var(--gray-light);">
-      ❌ Mazeret Bildirenler (${noResponses.length})
-    </div>`;
-  if (!noResponses.length) {
-    html += `<div style="color:var(--gray); font-size:12px; padding:8px 0;">Mazeret bildiren yok.</div>`;
-  } else {
-    html += noResponses.map(r => `
-      <div style="background:rgba(192,57,43,0.06); padding:12px 14px; border-radius:8px; margin-bottom:10px; border-left:3px solid var(--red);">
-        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
-          <strong style="font-size:13px;">${r.userName}</strong>
-          <span style="font-size:11px; color:var(--gray);">${formatDate(r.date.split('T')[0])}</span>
-        </div>
-        <div style="font-size:13px; color:var(--navy); white-space:pre-wrap; padding:8px 10px; background:var(--white); border-radius:6px;">"${r.excuse}"</div>
-      </div>`).join('');
-  }
-  html += `</div>`;
-
-  // Katılacaklar
-  html += `<div style="margin-bottom:24px;">
-    <div style="font-size:13px; font-weight:600; color:var(--green); margin-bottom:12px; padding-bottom:8px; border-bottom:1px solid var(--gray-light);">
-      ✅ Katılacaklar (${yesResponses.length})
-    </div>`;
-  if (!yesResponses.length) {
-    html += `<div style="color:var(--gray); font-size:12px; padding:8px 0;">Henüz katılım onayı yok.</div>`;
-  } else {
-    html += `<div style="display:flex; flex-wrap:wrap; gap:8px;">` + yesResponses.map(r =>
-      `<span class="badge badge-green" style="padding:6px 12px;">${r.userName}</span>`
-    ).join('') + `</div>`;
-  }
-  html += `</div>`;
-
-  // Yanıt bekleyenler
-  html += `<div>
-    <div style="font-size:13px; font-weight:600; color:var(--gray); margin-bottom:12px; padding-bottom:8px; border-bottom:1px solid var(--gray-light);">
-      ⏳ Yanıt Bekleyenler (${pending.length})
-    </div>`;
-  if (!pending.length) {
-    html += `<div style="color:var(--gray); font-size:12px; padding:8px 0;">Tüm üyeler yanıt verdi.</div>`;
-  } else {
-    html += `<div style="display:flex; flex-wrap:wrap; gap:8px;">` + pending.map(m =>
-      `<span class="badge badge-gray" style="padding:6px 12px;">${m.name}</span>`
-    ).join('') + `</div>`;
-  }
-  html += `</div>`;
-
-  document.getElementById('excuseListBody').innerHTML = html;
-  openModal('modalExcuseList');
-}
-
-// ═══════════════════════════════════════════════
-// RENDER
-// ═══════════════════════════════════════════════
-
 function renderAll() {
-  const d = getData();
-  renderStats(d);
-  renderDashMeetings(d);
-  renderDashAnnouncements(d);
-  renderMeetingList(d);
-  renderNotes(d);
-  renderMembers(d);
-  renderAnnouncements(d);
+  if (!currentProfile) return;
+  renderStats();
+  renderDashMeetings();
+  renderDashAnnouncements();
+  renderMeetingList();
+  renderNotes();
+  renderMembers();
+  renderAnnouncements();
   renderCalendar();
   renderMeetingAlert();
+  renderApprovalBadge();
+  // Aktif sayfa admin sayfalarından biriyse onları da güncelle
+  if ($('page-admin').classList.contains('active')) renderAdmin();
+  if ($('page-analytics').classList.contains('active')) renderAnalytics();
+  if ($('page-pending').classList.contains('active')) renderPending();
+  if ($('page-approvals').classList.contains('active')) renderApprovals();
 }
 
-function renderStats(d) {
-  document.getElementById('statMembers').textContent = d.members.length;
-  document.getElementById('statMeetings').textContent = d.meetings.length;
-  document.getElementById('statNotes').textContent = d.notes.length;
-  document.getElementById('statAnn').textContent = d.announcements.length;
+function memberList() {
+  // Sadece aktif (onaylı) üyeler
+  return toArray(DATA.members).filter(m => m.status === 'aktif');
 }
 
-function getMeetingsSorted(d) {
-  const today = new Date().toISOString().split('T')[0];
-  return [...d.meetings].sort((a,b) => a.date.localeCompare(b.date));
+function renderStats() {
+  $('statMembers').textContent = memberList().length;
+  $('statMeetings').textContent = toArray(DATA.meetings).length;
+  $('statNotes').textContent = toArray(DATA.notes).length;
+  $('statAnn').textContent = toArray(DATA.announcements).length;
 }
 
-function renderDashMeetings(d) {
-  const el = document.getElementById('dashMeetings');
-  const today = new Date().toISOString().split('T')[0];
-  const upcoming = getMeetingsSorted(d).filter(m => m.date >= today).slice(0, 3);
-  if (!upcoming.length) { el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📅</div><div class="empty-state-text">Yaklaşan toplantı yok</div></div>'; return; }
-  el.innerHTML = upcoming.map(m => meetingItemHTML(m)).join('');
+function renderApprovalBadge() {
+  const pending = toArray(DATA.members).filter(m => m.status === 'beklemede').length;
+  const badge = $('approvalBadge');
+  if (pending > 0) {
+    badge.style.display = 'inline-flex';
+    badge.textContent = pending;
+  } else {
+    badge.style.display = 'none';
+  }
 }
 
+// ─── DASHBOARD: Toplantılar ───
 function meetingItemHTML(m) {
   const d = new Date(m.date);
   const months = ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
@@ -2038,17 +1921,36 @@ function meetingItemHTML(m) {
   </div>`;
 }
 
-function renderMeetingList(d) {
-  const el = document.getElementById('meetingList');
-  if (!d.meetings.length) { el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📅</div><div class="empty-state-text">Toplantı yok</div></div>'; return; }
-  const sorted = getMeetingsSorted(d);
+function renderDashMeetings() {
+  const el = $('dashMeetings');
   const today = new Date().toISOString().split('T')[0];
-  el.innerHTML = sorted.map(m => {
+  const upcoming = toArray(DATA.meetings)
+    .filter(m => m.date >= today)
+    .sort((a,b) => a.date.localeCompare(b.date))
+    .slice(0, 3);
+  if (!upcoming.length) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📅</div><div class="empty-state-text">Yaklaşan toplantı yok</div></div>';
+    return;
+  }
+  el.innerHTML = upcoming.map(meetingItemHTML).join('');
+}
+
+function renderMeetingList() {
+  const el = $('meetingList');
+  const meetings = toArray(DATA.meetings).sort((a,b) => a.date.localeCompare(b.date));
+  if (!meetings.length) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📅</div><div class="empty-state-text">Toplantı yok</div></div>';
+    return;
+  }
+  const today = new Date().toISOString().split('T')[0];
+  const months = ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
+  el.innerHTML = meetings.map(m => {
     const past = m.date < today;
+    const dt = new Date(m.date);
     return `<div class="meeting-item">
       <div class="meeting-date-box" style="${past ? 'background:var(--gray)' : ''}">
-        <div class="meeting-date-day">${new Date(m.date).getDate()}</div>
-        <div class="meeting-date-month">${['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'][new Date(m.date).getMonth()]}</div>
+        <div class="meeting-date-day">${dt.getDate()}</div>
+        <div class="meeting-date-month">${months[dt.getMonth()]}</div>
       </div>
       <div class="meeting-info">
         <div class="meeting-name">${m.title} ${past ? '<span class="badge badge-gray">Geçmiş</span>' : '<span class="badge badge-green">Yaklaşan</span>'}</div>
@@ -2058,57 +1960,65 @@ function renderMeetingList(d) {
   }).join('');
 }
 
-function renderDashAnnouncements(d) {
-  const el = document.getElementById('dashAnnouncements');
-  const items = [...d.announcements].reverse().slice(0,3);
-  el.innerHTML = items.map(a => announcementHTML(a)).join('');
+// ─── DASHBOARD: Duyurular ───
+function renderDashAnnouncements() {
+  const el = $('dashAnnouncements');
+  const items = toArray(DATA.announcements).sort((a,b) => (b.date||'').localeCompare(a.date||'')).slice(0,3);
+  if (!items.length) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📢</div><div class="empty-state-text">Duyuru yok</div></div>';
+    return;
+  }
+  el.innerHTML = items.map(a => `<div class="announcement-item ${a.priority !== 'normal' ? 'pinned' : ''}">
+    <div class="announcement-title">${a.priority === 'acil' ? '🔴 ' : a.priority === 'önemli' ? '🟡 ' : ''}${a.title}</div>
+    <div class="announcement-body">${a.body || ''}</div>
+    <div class="announcement-meta">📅 ${formatDate(a.date)}</div>
+  </div>`).join('');
 }
 
-function renderAnnouncements(d) {
-  const el = document.getElementById('announcementList');
-  if (!d.announcements.length) { el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📢</div><div class="empty-state-text">Duyuru yok</div></div>'; return; }
-  el.innerHTML = [...d.announcements].reverse().map((a,i) => `
+function renderAnnouncements() {
+  const el = $('announcementList');
+  const items = toArray(DATA.announcements).sort((a,b) => (b.date||'').localeCompare(a.date||''));
+  if (!items.length) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📢</div><div class="empty-state-text">Duyuru yok</div></div>';
+    return;
+  }
+  el.innerHTML = items.map(a => `
     <div class="announcement-item ${a.priority === 'önemli' || a.priority === 'acil' ? 'pinned' : ''}">
       <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px;">
         <div>
-          <div class="announcement-title">
-            ${a.priority === 'acil' ? '🔴 ' : a.priority === 'önemli' ? '🟡 ' : '🔵 '}${a.title}
-          </div>
-          <div class="announcement-body">${a.body}</div>
-          <div class="announcement-meta">✍️ ${a.author} · 📅 ${formatDate(a.date)} · <span class="badge badge-${a.priority === 'acil' ? 'red' : a.priority === 'önemli' ? 'gold' : 'navy'}">${a.priority}</span></div>
+          <div class="announcement-title">${a.priority === 'acil' ? '🔴 ' : a.priority === 'önemli' ? '🟡 ' : '🔵 '}${a.title}</div>
+          <div class="announcement-body">${a.body || ''}</div>
+          <div class="announcement-meta">✍️ ${a.author || '-'} · 📅 ${formatDate(a.date)} · <span class="badge badge-${a.priority === 'acil' ? 'red' : a.priority === 'önemli' ? 'gold' : 'navy'}">${a.priority}</span></div>
         </div>
-        <button class="btn-danger" style="padding:5px 10px; font-size:11px; flex-shrink:0;" onclick="deleteAnnouncement(${a.id})">Sil</button>
+        ${isEditor() ? `<button class="btn-danger" style="padding:5px 10px; font-size:11px; flex-shrink:0;" onclick="deleteAnnouncement('${a._key}')">Sil</button>` : ''}
       </div>
     </div>
   `).join('');
 }
 
-function announcementHTML(a) {
-  return `<div class="announcement-item ${a.priority !== 'normal' ? 'pinned' : ''}">
-    <div class="announcement-title">${a.priority === 'acil' ? '🔴 ' : a.priority === 'önemli' ? '🟡 ' : ''}${a.title}</div>
-    <div class="announcement-body">${a.body}</div>
-    <div class="announcement-meta">📅 ${formatDate(a.date)}</div>
-  </div>`;
-}
-
-function renderNotes(d) {
-  const el = document.getElementById('notesList');
-  renderNotesFiltered(d.notes, d);
-}
-
-function renderNotesFiltered(notes, d) {
-  const el = document.getElementById('notesList');
-  if (!notes.length) { el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📝</div><div class="empty-state-text">Tutanak yok</div></div>'; return; }
-  el.innerHTML = [...notes].reverse().map(n => {
-    const mtg = d.meetings.find(m => m.id === n.meetingId);
-    return `<div class="note-card" onclick="viewNote(${n.id})">
+// ─── TUTANAKLAR ───
+function renderNotes(filterQ) {
+  const el = $('notesList');
+  let notes = toArray(DATA.notes);
+  if (filterQ) {
+    const q = filterQ.toLowerCase();
+    notes = notes.filter(n => (n.title||'').toLowerCase().includes(q) || (n.body||'').toLowerCase().includes(q));
+  }
+  notes.sort((a,b) => (b.date||'').localeCompare(a.date||''));
+  if (!notes.length) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📝</div><div class="empty-state-text">Tutanak yok</div></div>';
+    return;
+  }
+  el.innerHTML = notes.map(n => {
+    const mtg = n.meetingKey && DATA.meetings[n.meetingKey];
+    return `<div class="note-card" onclick="viewNote('${n._key}')">
       <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:4px;">
         <div class="note-card-title">${n.title}</div>
         <span class="badge ${n.status === 'onaylı' ? 'badge-green' : 'badge-gray'}">${n.status}</span>
       </div>
-      <div class="note-card-preview">${n.body}</div>
+      <div class="note-card-preview">${n.body || ''}</div>
       <div class="note-card-meta">
-        <span>✍️ ${n.author}</span>
+        <span>✍️ ${n.author || '-'}</span>
         <span>📅 ${formatDate(n.date)}</span>
         ${mtg ? `<span>📋 ${mtg.title}</span>` : ''}
       </div>
@@ -2116,641 +2026,168 @@ function renderNotesFiltered(notes, d) {
   }).join('');
 }
 
-function filterNotes(q) {
-  const d = getData();
-  const filtered = q ? d.notes.filter(n => n.title.toLowerCase().includes(q.toLowerCase()) || n.body.toLowerCase().includes(q.toLowerCase())) : d.notes;
-  renderNotesFiltered(filtered, d);
-}
+window.filterNotes = function(q) { renderNotes(q); };
 
-function viewNote(id) {
-  const d = getData();
-  const n = d.notes.find(n => n.id === id);
+window.viewNote = function(key) {
+  const n = DATA.notes[key];
   if (!n) return;
-  const mtg = d.meetings.find(m => m.id === n.meetingId);
-  document.getElementById('noteViewTitle').textContent = n.title;
-  document.getElementById('noteViewBadges').innerHTML = `
+  const mtg = n.meetingKey && DATA.meetings[n.meetingKey];
+  $('noteViewTitle').textContent = n.title;
+  $('noteViewBadges').innerHTML = `
     <span class="badge ${n.status === 'onaylı' ? 'badge-green' : 'badge-gray'}">${n.status}</span>
-    ${mtg ? `<span class="badge badge-navy">📋 ${mtg.title}</span>` : ''}
-  `;
-  document.getElementById('noteViewMeta').innerHTML = `✍️ <strong>${n.author}</strong> &nbsp;·&nbsp; 📅 ${formatDate(n.date)}`;
-  document.getElementById('noteViewBody').textContent = n.body;
+    ${mtg ? `<span class="badge badge-navy">📋 ${mtg.title}</span>` : ''}`;
+  $('noteViewMeta').innerHTML = `✍️ <strong>${n.author || '-'}</strong> &nbsp;·&nbsp; 📅 ${formatDate(n.date)}`;
+  $('noteViewBody').textContent = n.body || '';
   openModal('modalNoteView');
-}
+};
 
-function renderMembers(d) {
-  const el = document.getElementById('membersTable');
-  if (!d.members.length) { el.innerHTML = '<tr><td colspan="4" style="text-align:center; color:var(--gray); padding:32px;">Üye yok</td></tr>'; return; }
-  el.innerHTML = d.members.map(m => `<tr>
+// ─── ÜYELER ───
+function renderMembers() {
+  const el = $('membersTable');
+  const members = memberList();
+  if (!members.length) {
+    el.innerHTML = '<tr><td colspan="4" style="text-align:center; color:var(--gray); padding:32px;">Üye yok</td></tr>';
+    return;
+  }
+  el.innerHTML = members.map(m => `<tr>
     <td>
       <div style="display:flex; align-items:center; gap:10px;">
-        <div class="user-avatar" style="width:32px; height:32px; font-size:12px; background:var(--navy-light);">${m.name.split(' ').map(x=>x[0]).slice(0,2).join('')}</div>
-        <div>
-          <div style="font-weight:600;">${m.name}</div>
-        </div>
+        <div class="user-avatar" style="width:32px; height:32px; font-size:12px; background:var(--navy-light);">${initials(m.name)}</div>
+        <div style="font-weight:600;">${m.name}</div>
       </div>
     </td>
     <td><span class="badge ${roleBadge(m.role)}">${m.role}</span></td>
-    <td><div style="font-size:12px;">${m.email}</div><div style="font-size:11px; color:var(--gray)">${m.phone}</div></td>
-    <td><span class="badge ${m.status === 'aktif' ? 'badge-green' : 'badge-gray'}">${m.status}</span></td>
+    <td><div style="font-size:12px;">${m.email}</div><div style="font-size:11px; color:var(--gray)">${m.phone || ''}</div></td>
+    <td><span class="badge badge-green">Aktif</span></td>
   </tr>`).join('');
 }
 
-function roleBadge(role) {
-  if (role === 'Başkan') return 'badge-gold';
-  if (role === 'Asbaşkan') return 'badge-navy';
-  if (role === 'Komisyon Sözcüsü') return 'badge-purple';
-  return 'badge-gray';
-}
-
 // ═══════════════════════════════════════════════
-// MAGAZINE / DERGİ
+// ÜYELİK ONAYLARI (Admin)
 // ═══════════════════════════════════════════════
+function renderApprovals() {
+  const el = $('approvalsContent');
+  const pending = toArray(DATA.members).filter(m => m.status === 'beklemede');
+  const rejected = toArray(DATA.members).filter(m => m.status === 'reddedildi');
 
-let magazineFileData = null; // geçici PDF data URL
-let magazineCoverData = null; // geçici cover data URL
+  let html = '';
 
-function handleMagazineFile() {
-  const file = document.getElementById('magPdfFile').files[0];
-  const preview = document.getElementById('magFilePreview');
-  if (!file) { magazineFileData = null; preview.style.display = 'none'; return; }
-
-  if (file.type !== 'application/pdf') {
-    showToast('Sadece PDF dosyası yükleyebilirsiniz.', 'error');
-    document.getElementById('magPdfFile').value = '';
-    return;
-  }
-
-  // Yaklaşık 4 MB (5MB raw, base64'te ~33% büyür)
-  if (file.size > 4 * 1024 * 1024) {
-    showToast('Dosya çok büyük! Maksimum 4 MB olmalı.', 'error');
-    document.getElementById('magPdfFile').value = '';
-    return;
-  }
-
-  const reader = new FileReader();
-  reader.onload = e => {
-    magazineFileData = e.target.result;
-    preview.style.display = 'block';
-    preview.innerHTML = `📄 <strong>${file.name}</strong> &nbsp;·&nbsp; ${(file.size/1024/1024).toFixed(2)} MB`;
-  };
-  reader.readAsDataURL(file);
-}
-
-function handleCoverFile() {
-  const file = document.getElementById('magCoverFile').files[0];
-  const preview = document.getElementById('magCoverPreview');
-  if (!file) { magazineCoverData = null; preview.style.display = 'none'; return; }
-  if (file.size > 1 * 1024 * 1024) {
-    showToast('Kapak görseli en fazla 1 MB olabilir.', 'error');
-    document.getElementById('magCoverFile').value = '';
-    return;
-  }
-  const reader = new FileReader();
-  reader.onload = e => {
-    magazineCoverData = e.target.result;
-    preview.style.display = 'block';
-    preview.innerHTML = `<img src="${e.target.result}" style="max-width:120px; max-height:160px; border-radius:6px; box-shadow:var(--shadow);">`;
-  };
-  reader.readAsDataURL(file);
-}
-
-function saveMagazine() {
-  const year = parseInt(document.getElementById('magYear').value);
-  const month = parseInt(document.getElementById('magMonth').value);
-  const issue = document.getElementById('magIssue').value.trim();
-  const desc = document.getElementById('magDesc').value.trim();
-
-  if (!magazineFileData) {
-    showToast('Lütfen bir PDF dosyası seçin.', 'error');
-    return;
-  }
-
-  const d = getData();
-  // Aynı ay-yıl için zaten dergi varsa uyar
-  const existing = d.magazines.find(m => m.year === year && m.month === month);
-  if (existing) {
-    if (!confirm(`${MONTHS_TR[month]} ${year} sayısı zaten yüklü. Üzerine yazmak istiyor musunuz?`)) return;
-    deleteMagazineFile(existing.id);
-    d.magazines = d.magazines.filter(m => m.id !== existing.id);
-  }
-
-  const id = Date.now();
-  // PDF'i ayrı kaydet
-  const ok = setMagazineFile(id, magazineFileData);
-  if (!ok) {
-    showToast('Tarayıcı depolama dolu. Eski sayıları silmeniz gerekebilir.', 'error');
-    return;
-  }
-
-  // Kapak da ayrı saklansın
-  if (magazineCoverData) {
-    try { localStorage.setItem('gm_cover_' + id, magazineCoverData); } catch (e) {}
-  }
-
-  d.magazines.push({
-    id,
-    year,
-    month,
-    issue,
-    desc,
-    fileName: document.getElementById('magPdfFile').files[0].name,
-    fileSize: document.getElementById('magPdfFile').files[0].size,
-    hasCover: !!magazineCoverData,
-    uploadedBy: currentUser.name,
-    uploadDate: new Date().toISOString().split('T')[0]
-  });
-  saveData(d);
-
-  closeModal('modalMagazine');
-  renderMagazine();
-  showToast('Dergi yayınlandı!', 'success');
-
-  // Formu temizle
-  document.getElementById('magIssue').value = '';
-  document.getElementById('magDesc').value = '';
-  document.getElementById('magPdfFile').value = '';
-  document.getElementById('magCoverFile').value = '';
-  document.getElementById('magFilePreview').style.display = 'none';
-  document.getElementById('magCoverPreview').style.display = 'none';
-  magazineFileData = null;
-  magazineCoverData = null;
-}
-
-function viewMagazine(id) {
-  const pdf = getMagazineFile(id);
-  if (!pdf) { showToast('Dosya bulunamadı.', 'error'); return; }
-  // Yeni sekmede aç
-  const win = window.open();
-  if (win) {
-    win.document.write(`
-      <html><head><title>Dergi</title></head>
-      <body style="margin:0; height:100vh;">
-        <embed src="${pdf}" type="application/pdf" width="100%" height="100%">
-      </body></html>
-    `);
-  } else {
-    showToast('Pop-up engellendi! Lütfen izin verin.', 'error');
-  }
-}
-
-function downloadMagazine(id) {
-  const d = getData();
-  const mag = d.magazines.find(m => m.id === id);
-  const pdf = getMagazineFile(id);
-  if (!pdf || !mag) { showToast('Dosya bulunamadı.', 'error'); return; }
-  const link = document.createElement('a');
-  link.href = pdf;
-  link.download = mag.fileName || `Dergi-${MONTHS_TR[mag.month]}-${mag.year}.pdf`;
-  link.click();
-}
-
-function deleteMagazine(id) {
-  if (!confirm('Bu dergi sayısını silmek istediğinize emin misiniz?')) return;
-  const d = getData();
-  d.magazines = d.magazines.filter(m => m.id !== id);
-  saveData(d);
-  deleteMagazineFile(id);
-  localStorage.removeItem('gm_cover_' + id);
-  renderMagazine();
-  showToast('Dergi silindi.', 'success');
-}
-
-function renderMagazine() {
-  const featuredEl = document.getElementById('featuredMagazine');
-  const archiveEl = document.getElementById('magazineArchive');
-
-  featuredEl.innerHTML = `
-    <div style="background:linear-gradient(135deg, var(--navy), var(--navy-light)); border-radius:14px; padding:48px 32px; color:var(--white); text-align:center; position:relative; overflow:hidden; box-shadow:var(--shadow-lg);">
-      <div style="position:absolute; top:-60px; right:-60px; width:240px; height:240px; background:radial-gradient(circle, rgba(200,168,75,0.18) 0%, transparent 70%); border-radius:50%;"></div>
-      <div style="position:absolute; bottom:-80px; left:-80px; width:280px; height:280px; background:radial-gradient(circle, rgba(200,168,75,0.08) 0%, transparent 70%); border-radius:50%;"></div>
-      <div style="position:relative; z-index:1;">
-        <div style="font-size:64px; margin-bottom:16px;">📖</div>
-        <div style="font-family:'Playfair Display', serif; font-size:28px; font-weight:700; margin-bottom:8px;">Aylık Dergi Arşivi</div>
-        <div style="display:inline-block; padding:6px 16px; background:rgba(200,168,75,0.2); color:var(--gold); border-radius:20px; font-size:11px; letter-spacing:2px; text-transform:uppercase; margin-bottom:20px;">⏳ Yakında</div>
-        <div style="font-size:14px; color:rgba(255,255,255,0.8); line-height:1.7; max-width:520px; margin:0 auto;">
-          Dergimizin aylık sayılarına buradan erişebileceksiniz. Bu özellik bulut depolama altyapısı ile birlikte yakında devreye alınacaktır.
-        </div>
-        <div style="display:flex; gap:24px; justify-content:center; margin-top:32px; flex-wrap:wrap; padding-top:24px; border-top:1px solid rgba(255,255,255,0.1);">
-          <div style="text-align:center;">
-            <div style="font-size:24px; margin-bottom:4px;">📚</div>
-            <div style="font-size:11px; color:rgba(255,255,255,0.6); letter-spacing:1px;">Tüm Sayılar</div>
-          </div>
-          <div style="text-align:center;">
-            <div style="font-size:24px; margin-bottom:4px;">⬇️</div>
-            <div style="font-size:11px; color:rgba(255,255,255,0.6); letter-spacing:1px;">PDF İndirme</div>
-          </div>
-          <div style="text-align:center;">
-            <div style="font-size:24px; margin-bottom:4px;">🔍</div>
-            <div style="font-size:11px; color:rgba(255,255,255,0.6); letter-spacing:1px;">Sayı Arşivi</div>
-          </div>
-          <div style="text-align:center;">
-            <div style="font-size:24px; margin-bottom:4px;">☁️</div>
-            <div style="font-size:11px; color:rgba(255,255,255,0.6); letter-spacing:1px;">Bulut Depolama</div>
-          </div>
-        </div>
-      </div>
-    </div>`;
-  archiveEl.innerHTML = '';
-}
-
-function renderPending() {
-  const d = getData();
-  const alert = getNextMeetingAlert();
-  const el = document.getElementById('pendingContent');
-
-  // Yaklaşan toplantı var mı?
-  if (!alert.showAlert) {
-    el.innerHTML = `
-      <div class="card">
-        <div class="card-body">
-          <div class="empty-state">
-            <div class="empty-state-icon">📅</div>
-            <div class="empty-state-text" style="font-size:15px; margin-bottom:8px;">Aktif yaklaşan toplantı yok</div>
-            <div style="font-size:12px; color:var(--gray); max-width:400px; margin:0 auto;">
-              Yanıt takibi, her ayın 1. cuması başlar ve 2. cuma (toplantı günü) sona erer.
-              Şu anda aktif bir yanıt dönemi bulunmamaktadır.
-            </div>
-          </div>
-        </div>
-      </div>`;
-    return;
-  }
-
-  // Yaklaşan toplantıyı bul/ekle
-  const meeting = ensureScheduledMeeting(alert.meetingDateStr);
-  const responses = (d.responses || []).filter(r => r.meetingId === meeting.id);
-  const respondedIds = responses.map(r => r.userId);
-  const pending = d.members.filter(m => !respondedIds.includes(m.id));
-  const yesResponses = responses.filter(r => r.status === 'katılıyor');
-  const noResponses = responses.filter(r => r.status === 'katılmıyor');
-  const totalMembers = d.members.length;
-  const responseRate = totalMembers > 0 ? Math.round(((totalMembers - pending.length) / totalMembers) * 100) : 0;
-
-  const meetingDate = new Date(meeting.date);
-  const dateStr = `${meetingDate.getDate()} ${MONTHS_TR[meetingDate.getMonth()]} ${meetingDate.getFullYear()} Cuma`;
-
-  let html = `
-    <!-- Toplantı Bilgi Kartı -->
-    <div style="background:linear-gradient(135deg, var(--navy), var(--navy-light)); border-radius:14px; padding:24px 28px; color:var(--white); margin-bottom:24px; position:relative; overflow:hidden; box-shadow:var(--shadow);">
-      <div style="position:absolute; top:-40px; right:-40px; width:180px; height:180px; background:radial-gradient(circle, rgba(200,168,75,0.15) 0%, transparent 70%); border-radius:50%;"></div>
-      <div style="position:relative; z-index:1;">
-        <div style="font-size:11px; letter-spacing:2px; color:var(--gold); text-transform:uppercase; margin-bottom:8px;">Yaklaşan Toplantı</div>
-        <div style="font-family:'Playfair Display', serif; font-size:22px; font-weight:600; margin-bottom:6px;">${meeting.title}</div>
-        <div style="font-size:14px; color:rgba(255,255,255,0.85);">📅 ${dateStr} &nbsp;·&nbsp; 🕐 ${meeting.time} &nbsp;·&nbsp; 📍 ${meeting.place}</div>
-      </div>
-    </div>
-
-    <!-- İstatistikler -->
-    <div class="stats-grid" style="grid-template-columns: repeat(4, 1fr);">
-      <div class="stat-card" data-icon="👥">
-        <div class="stat-label">Toplam Üye</div>
-        <div class="stat-value">${totalMembers}</div>
-      </div>
-      <div class="stat-card" data-icon="✅" style="border-left-color: var(--green)">
-        <div class="stat-label">Katılacak</div>
-        <div class="stat-value" style="color:var(--green);">${yesResponses.length}</div>
-      </div>
-      <div class="stat-card" data-icon="❌" style="border-left-color: var(--red)">
-        <div class="stat-label">Mazeretli</div>
-        <div class="stat-value" style="color:var(--red);">${noResponses.length}</div>
-      </div>
-      <div class="stat-card" data-icon="⏳" style="border-left-color: var(--gold)">
-        <div class="stat-label">Yanıt Bekleyen</div>
-        <div class="stat-value" style="color:#8a6a1a;">${pending.length}</div>
-        <div class="stat-sub">Yanıt oranı: %${responseRate}</div>
-      </div>
-    </div>
-  `;
-
-  // Yanıt vermeyenler tablosu (ana içerik)
-  html += `
-    <div class="card" style="margin-bottom:20px;">
-      <div class="card-header">
-        <div class="card-title">⏳ Yanıt Vermeyen Üyeler (${pending.length})</div>
-      </div>
-      <div class="card-body">
-  `;
+  // Bekleyen başvurular
+  html += `<div class="card" style="margin-bottom:20px;">
+    <div class="card-header"><div class="card-title">⏳ Bekleyen Başvurular (${pending.length})</div></div>
+    <div class="card-body">`;
 
   if (!pending.length) {
-    html += `
-      <div class="empty-state" style="padding:40px 20px;">
-        <div class="empty-state-icon">🎉</div>
-        <div class="empty-state-text" style="font-size:15px; color:var(--green); font-weight:600;">Tüm üyeler yanıt verdi!</div>
-        <div style="font-size:12px; color:var(--gray); margin-top:8px;">Bu toplantı için bekleyen yanıt yok.</div>
-      </div>
-    `;
+    html += `<div class="empty-state" style="padding:32px;">
+      <div class="empty-state-icon">✅</div>
+      <div class="empty-state-text">Bekleyen başvuru yok</div>
+    </div>`;
   } else {
-    html += `
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Üye</th>
-              <th>Rol</th>
-              <th>İletişim</th>
-              <th>Durum</th>
-              <th>İşlem</th>
-            </tr>
-          </thead>
-          <tbody>
-    `;
     html += pending.map(m => `
-      <tr>
-        <td>
-          <div style="display:flex; align-items:center; gap:10px;">
-            <div class="user-avatar" style="width:36px; height:36px; font-size:13px; background:var(--navy-light);">${m.name.split(' ').map(x=>x[0]).slice(0,2).join('')}</div>
-            <strong>${m.name}</strong>
+      <div class="pending-card highlight">
+        <div style="display:flex; align-items:center; gap:14px; margin-bottom:14px;">
+          <div class="user-avatar" style="width:48px; height:48px; font-size:16px; background:var(--navy);">${initials(m.name)}</div>
+          <div style="flex:1;">
+            <div style="font-size:15px; font-weight:600; color:var(--navy);">${m.name}</div>
+            <div style="font-size:12px; color:var(--gray);">📧 ${m.email} &nbsp;·&nbsp; 📞 ${m.phone || '-'}</div>
+            <div style="font-size:11px; color:var(--gray); margin-top:2px;">📅 Başvuru: ${formatDate(m.joinDate)}</div>
           </div>
-        </td>
-        <td><span class="badge ${roleBadge(m.role)}">${m.role}</span></td>
-        <td>
-          <div style="font-size:12px;">${m.email}</div>
-          <div style="font-size:11px; color:var(--gray);">${m.phone}</div>
-        </td>
-        <td><span class="badge badge-gold">⏳ Yanıt bekleniyor</span></td>
-        <td>
-          <div style="display:flex; gap:6px;">
-            ${m.phone ? `<a href="tel:${m.phone.replace(/\s/g,'')}" class="btn-action" style="padding:5px 12px; font-size:11px; text-decoration:none; display:inline-block;">📞 Ara</a>` : ''}
-            <a href="https://wa.me/9${m.phone.replace(/\s/g,'')}?text=Sayın ${encodeURIComponent(m.name.split(' ')[0])}, ${encodeURIComponent(dateStr + ' tarihindeki ' + meeting.title + ' toplantısına katılım durumunuzu sistemden bildirmenizi rica ederiz.')}" target="_blank" class="btn-action" style="padding:5px 12px; font-size:11px; background:linear-gradient(135deg, #25D366, #128C7E); text-decoration:none; display:inline-block;">💬 WhatsApp</a>
-          </div>
-        </td>
-      </tr>
+        </div>
+        <div style="display:flex; gap:10px;">
+          <button class="btn-action" style="background:linear-gradient(135deg, var(--green), #2a9b75); flex:1;" onclick="approveMember('${m._key}')">✅ Onayla</button>
+          <button class="btn-danger" style="flex:1;" onclick="rejectMember('${m._key}')">🚫 Reddet</button>
+        </div>
+      </div>
     `).join('');
-    html += `</tbody></table></div>`;
   }
   html += `</div></div>`;
 
-  // Mazeret bildirenler
-  if (noResponses.length) {
-    html += `
-      <div class="card" style="margin-bottom:20px;">
-        <div class="card-header">
-          <div class="card-title">❌ Mazeret Bildirenler (${noResponses.length})</div>
+  // Reddedilenler
+  if (rejected.length) {
+    html += `<div class="card">
+      <div class="card-header"><div class="card-title">🚫 Reddedilen Başvurular (${rejected.length})</div></div>
+      <div class="card-body">`;
+    html += rejected.map(m => `
+      <div class="pending-card">
+        <div style="display:flex; align-items:center; gap:14px;">
+          <div class="user-avatar" style="width:40px; height:40px; font-size:14px; background:var(--gray);">${initials(m.name)}</div>
+          <div style="flex:1;">
+            <div style="font-size:14px; font-weight:600; color:var(--navy);">${m.name}</div>
+            <div style="font-size:12px; color:var(--gray);">${m.email}</div>
+          </div>
+          <button class="btn-secondary" style="padding:6px 14px; font-size:12px;" onclick="approveMember('${m._key}')">Tekrar Onayla</button>
         </div>
-        <div class="card-body">
-    `;
-    html += noResponses.map(r => `
-      <div style="background:rgba(192,57,43,0.06); padding:14px 16px; border-radius:8px; margin-bottom:10px; border-left:3px solid var(--red);">
-        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
-          <strong style="font-size:13px;">${r.userName}</strong>
-          <span style="font-size:11px; color:var(--gray);">📅 ${formatDate(r.date.split('T')[0])}</span>
-        </div>
-        <div style="font-size:13px; color:var(--navy); white-space:pre-wrap; padding:10px 12px; background:var(--white); border-radius:6px; line-height:1.5;">"${r.excuse}"</div>
       </div>
     `).join('');
     html += `</div></div>`;
   }
 
-  // Katılacaklar
-  if (yesResponses.length) {
-    html += `
-      <div class="card">
-        <div class="card-header">
-          <div class="card-title">✅ Katılacaklar (${yesResponses.length})</div>
-        </div>
-        <div class="card-body">
-          <div style="display:flex; flex-wrap:wrap; gap:8px;">
-            ${yesResponses.map(r => `<span class="badge badge-green" style="padding:7px 14px; font-size:12px;">${r.userName}</span>`).join('')}
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
   el.innerHTML = html;
 }
 
-function renderAnalytics() {
-  const d = getData();
-  const today = new Date().toISOString().split('T')[0];
-  const pastMeetings = d.meetings.filter(m => m.date <= today);
-  const totalPast = pastMeetings.length;
-
-  // Toplam istatistikler
-  document.getElementById('anStatTotal').textContent = totalPast;
-
-  // Üye bazında katılım hesabı
-  const attendance = d.members.map(m => {
-    const attended = pastMeetings.filter(mtg => (mtg.attendees || []).includes(m.id)).length;
-    const rate = totalPast > 0 ? Math.round((attended / totalPast) * 100) : 0;
-    return { ...m, attended, total: totalPast, rate };
-  }).sort((a,b) => b.rate - a.rate || b.attended - a.attended);
-
-  // Ortalama katılım oranı
-  const avgRate = attendance.length > 0
-    ? Math.round(attendance.reduce((s,m) => s + m.rate, 0) / attendance.length)
-    : 0;
-  document.getElementById('anStatAvg').textContent = avgRate + '%';
-
-  // En aktif üye
-  if (attendance.length > 0 && attendance[0].attended > 0) {
-    document.getElementById('anStatTop').textContent = attendance[0].name;
-    document.getElementById('anStatTopSub').textContent = `${attendance[0].attended}/${totalPast} toplantı (%${attendance[0].rate})`;
-  } else {
-    document.getElementById('anStatTop').textContent = '-';
-    document.getElementById('anStatTopSub').textContent = 'Veri yok';
+window.approveMember = async function(key) {
+  try {
+    await update(ref(db, 'members/' + key), { status: 'aktif' });
+    showToast('Üyelik onaylandı!', 'success');
+  } catch (e) {
+    showToast('Hata: ' + e.message, 'error');
   }
+};
 
-  // Üye bazlı tablo
-  const tbl = document.getElementById('analyticsTable');
-  if (!attendance.length) {
-    tbl.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--gray); padding:32px;">Veri yok</td></tr>';
-  } else {
-    tbl.innerHTML = attendance.map((m, idx) => {
-      let statusBadge = '';
-      if (m.rate >= 80) statusBadge = '<span class="badge badge-green">Mükemmel</span>';
-      else if (m.rate >= 60) statusBadge = '<span class="badge badge-gold">İyi</span>';
-      else if (m.rate >= 40) statusBadge = '<span class="badge badge-navy">Orta</span>';
-      else statusBadge = '<span class="badge badge-red">Düşük</span>';
-
-      const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}.`;
-
-      return `<tr>
-        <td><strong style="font-size:14px;">${medal}</strong></td>
-        <td>
-          <div style="display:flex; align-items:center; gap:10px;">
-            <div class="user-avatar" style="width:32px; height:32px; font-size:12px; background:var(--navy-light);">${m.name.split(' ').map(x=>x[0]).slice(0,2).join('')}</div>
-            <strong>${m.name}</strong>
-          </div>
-        </td>
-        <td><span class="badge ${roleBadge(m.role)}">${m.role}</span></td>
-        <td><strong>${m.attended}</strong> / ${m.total}</td>
-        <td>
-          <div style="display:flex; align-items:center; gap:10px;">
-            <div style="flex:1; max-width:140px; height:8px; background:var(--gray-light); border-radius:4px; overflow:hidden;">
-              <div style="height:100%; background:linear-gradient(90deg, var(--navy), var(--navy-light)); width:${m.rate}%; transition:width 0.5s;"></div>
-            </div>
-            <strong style="min-width:42px;">%${m.rate}</strong>
-          </div>
-        </td>
-        <td>${statusBadge}</td>
-      </tr>`;
-    }).join('');
+window.rejectMember = async function(key) {
+  if (!confirm('Bu başvuruyu reddetmek istediğinize emin misiniz?')) return;
+  try {
+    await update(ref(db, 'members/' + key), { status: 'reddedildi' });
+    showToast('Başvuru reddedildi.', 'success');
+  } catch (e) {
+    showToast('Hata: ' + e.message, 'error');
   }
-
-  // Toplantı bazlı tablo
-  const mt = document.getElementById('meetingAttendanceTable');
-  if (!pastMeetings.length) {
-    mt.innerHTML = '<tr><td colspan="4" style="text-align:center; color:var(--gray); padding:32px;">Geçmiş toplantı yok</td></tr>';
-  } else {
-    const totalMembers = d.members.length;
-    mt.innerHTML = [...pastMeetings].sort((a,b) => b.date.localeCompare(a.date)).map(m => {
-      const count = (m.attendees || []).length;
-      const rate = totalMembers > 0 ? Math.round((count / totalMembers) * 100) : 0;
-      return `<tr>
-        <td><strong>${m.title}</strong></td>
-        <td style="font-size:12px;">${formatDate(m.date)}</td>
-        <td><strong>${count}</strong> / ${totalMembers} kişi</td>
-        <td>
-          <div style="display:flex; align-items:center; gap:10px;">
-            <div style="flex:1; max-width:140px; height:8px; background:var(--gray-light); border-radius:4px; overflow:hidden;">
-              <div style="height:100%; background:linear-gradient(90deg, var(--gold), var(--gold-light)); width:${rate}%;"></div>
-            </div>
-            <strong style="min-width:42px;">%${rate}</strong>
-          </div>
-        </td>
-      </tr>`;
-    }).join('');
-  }
-}
-
-function renderAdmin() {
-  const d = getData();
-  document.getElementById('adStatM').textContent = d.members.length;
-  document.getElementById('adStatT').textContent = d.meetings.length;
-  document.getElementById('adStatN').textContent = d.notes.length;
-  document.getElementById('adStatA').textContent = d.announcements.length;
-
-  // Users table
-  const el = document.getElementById('adminUsersTable');
-  el.innerHTML = USERS.map(u => `<tr>
-    <td>${u.name}</td>
-    <td style="font-size:12px; color:var(--gray)">${u.email}</td>
-    <td><span class="badge ${roleBadge(u.role)}">${u.role}</span></td>
-  </tr>`).join('');
-
-  // Editable members table
-  const mt = document.getElementById('adminMembersTable');
-  if (!d.members.length) {
-    mt.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--gray); padding:32px;">Üye yok</td></tr>';
-    return;
-  }
-  mt.innerHTML = d.members.map(m => `<tr>
-    <td>
-      <div style="display:flex; align-items:center; gap:10px;">
-        <div class="user-avatar" style="width:32px; height:32px; font-size:12px; background:var(--navy-light);">${m.name.split(' ').map(x=>x[0]).slice(0,2).join('')}</div>
-        <strong>${m.name}</strong>
-      </div>
-    </td>
-    <td><span class="badge ${roleBadge(m.role)}">${m.role}</span></td>
-    <td style="font-size:12px;">${m.email}</td>
-    <td style="font-size:12px;">${m.phone}</td>
-    <td><span class="badge ${m.status === 'aktif' ? 'badge-green' : 'badge-gray'}">${m.status}</span></td>
-    <td>
-      <div style="display:flex; gap:6px;">
-        <button class="btn-action" style="padding:5px 12px; font-size:11px;" onclick="openEditMember(${m.id})">✏️ Düzenle</button>
-        <button class="btn-danger" style="padding:5px 10px; font-size:11px;" onclick="deleteMember(${m.id})">Sil</button>
-      </div>
-    </td>
-  </tr>`).join('');
-}
-
-function openEditMember(id) {
-  const d = getData();
-  const m = d.members.find(m => m.id === id);
-  if (!m) return;
-  const parts = m.name.split(' ');
-  document.getElementById('editMemId').value = m.id;
-  document.getElementById('editMemFirst').value = parts[0] || '';
-  document.getElementById('editMemLast').value = parts.slice(1).join(' ') || '';
-  document.getElementById('editMemEmail').value = m.email;
-  document.getElementById('editMemPhone').value = m.phone;
-  document.getElementById('editMemRole').value = m.role;
-  document.getElementById('editMemStatus').value = m.status;
-  openModal('modalEditMember');
-}
-
-function saveEditMember() {
-  const id = parseInt(document.getElementById('editMemId').value);
-  const first = document.getElementById('editMemFirst').value.trim();
-  const last = document.getElementById('editMemLast').value.trim();
-  const email = document.getElementById('editMemEmail').value.trim();
-  const phone = document.getElementById('editMemPhone').value.trim();
-  const role = document.getElementById('editMemRole').value;
-  const status = document.getElementById('editMemStatus').value;
-  if (!first) { showToast('Ad zorunludur.', 'error'); return; }
-  const d = getData();
-  const idx = d.members.findIndex(m => m.id === id);
-  if (idx === -1) return;
-  d.members[idx] = { ...d.members[idx], name: `${first} ${last}`.trim(), email, phone, role, status };
-  saveData(d);
-  closeModal('modalEditMember');
-  renderAll();
-  renderAdmin();
-  showToast('Üye bilgileri güncellendi!', 'success');
-}
+};
 
 // ═══════════════════════════════════════════════
-// CALENDAR
+// TAKVİM
 // ═══════════════════════════════════════════════
-
 let calYear = new Date().getFullYear();
 let calMonth = new Date().getMonth();
 let selectedDate = null;
-const MONTHS_TR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
-const DAYS_TR = ['Pzt','Sal','Çar','Per','Cum','Cmt','Paz'];
 
 function renderCalendar() {
-  const d = getData();
-  document.getElementById('calMonthLabel').textContent = `${MONTHS_TR[calMonth]} ${calYear}`;
-  const grid = document.getElementById('calGrid');
-  const meetingDates = d.meetings.map(m => m.date);
+  if (!$('calGrid')) return;
+  $('calMonthLabel').textContent = `${MONTHS_TR[calMonth]} ${calYear}`;
+  const grid = $('calGrid');
+  const meetingDates = toArray(DATA.meetings).map(m => m.date);
   const today = new Date().toISOString().split('T')[0];
 
   let html = DAYS_TR.map(d => `<div class="cal-day-header">${d}</div>`).join('');
-  
   const first = new Date(calYear, calMonth, 1);
   let startDay = first.getDay() - 1; if (startDay < 0) startDay = 6;
   const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
   const daysInPrev = new Date(calYear, calMonth, 0).getDate();
 
   for (let i = 0; i < startDay; i++) {
-    const d = daysInPrev - startDay + 1 + i;
-    html += `<div class="cal-day other-month">${d}</div>`;
+    html += `<div class="cal-day other-month">${daysInPrev - startDay + 1 + i}</div>`;
   }
-
   for (let d = 1; d <= daysInMonth; d++) {
     const ds = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     const isToday = ds === today;
     const hasMtg = meetingDates.includes(ds);
-    const isSelected = ds === selectedDate;
-    html += `<div class="cal-day ${isToday ? 'today' : ''} ${hasMtg ? 'has-meeting' : ''} ${isSelected ? 'selected' : ''}" onclick="selectDay('${ds}')">${d}</div>`;
+    const isSel = ds === selectedDate;
+    html += `<div class="cal-day ${isToday ? 'today' : ''} ${hasMtg ? 'has-meeting' : ''} ${isSel ? 'selected' : ''}" onclick="selectDay('${ds}')">${d}</div>`;
   }
-
-  const total = startDay + daysInMonth;
-  const remaining = 42 - total;
+  const remaining = 42 - (startDay + daysInMonth);
   for (let d = 1; d <= remaining; d++) {
     html += `<div class="cal-day other-month">${d}</div>`;
   }
-
   grid.innerHTML = html;
 }
 
-function selectDay(ds) {
+window.selectDay = function(ds) {
   selectedDate = ds;
   renderCalendar();
-  showDayMeetings(ds);
-}
-
-function showDayMeetings(ds) {
-  const d = getData();
-  const dayMeetings = d.meetings.filter(m => m.date === ds);
+  const dayMeetings = toArray(DATA.meetings).filter(m => m.date === ds);
   const date = new Date(ds);
-  const dateStr = `${date.getDate()} ${MONTHS_TR[date.getMonth()]} ${date.getFullYear()}`;
-
-  document.getElementById('selectedDayTitle').textContent = `📅 ${dateStr}`;
-
-  const list = document.getElementById('selectedDayMeetings');
+  $('selectedDayTitle').textContent = `📅 ${date.getDate()} ${MONTHS_TR[date.getMonth()]} ${date.getFullYear()}`;
+  const list = $('selectedDayMeetings');
   if (!dayMeetings.length) {
     list.innerHTML = `<div class="empty-state" style="padding:32px 16px;">
       <div class="empty-state-icon">📭</div>
@@ -2759,7 +2196,6 @@ function showDayMeetings(ds) {
     </div>`;
     return;
   }
-
   list.innerHTML = dayMeetings.map(m => `
     <div style="padding:14px; background:var(--cream); border-radius:10px; margin-bottom:10px; border-left:3px solid var(--gold);">
       <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px;">
@@ -2768,152 +2204,698 @@ function showDayMeetings(ds) {
       </div>
       <div style="font-size:12px; color:var(--gray); margin-bottom:6px;">📍 ${m.place}</div>
       ${m.agenda ? `<div style="font-size:12px; color:var(--navy); white-space:pre-wrap; padding:8px; background:var(--white); border-radius:6px; margin-top:6px;">${m.agenda}</div>` : ''}
-      <div style="font-size:11px; color:var(--gray); margin-top:8px;">👥 ${(m.attendees || []).length} katılımcı</div>
     </div>
   `).join('');
-}
+};
 
-function openModalForDate(ds) {
-  document.getElementById('mtgDate').value = ds;
+window.openModalForDate = function(ds) {
+  $('mtgDate').value = ds;
   openModal('modalMeeting');
+};
+
+window.calPrev = function() { calMonth--; if (calMonth < 0) { calMonth = 11; calYear--; } renderCalendar(); };
+window.calNext = function() { calMonth++; if (calMonth > 11) { calMonth = 0; calYear++; } renderCalendar(); };
+
+// ═══════════════════════════════════════════════
+// TOPLANTI UYARISI (Her ayın 2. cuması)
+// ═══════════════════════════════════════════════
+function getSecondFriday(year, month) {
+  const first = new Date(year, month, 1);
+  const firstFridayDate = (5 - first.getDay() + 7) % 7 + 1;
+  return new Date(year, month, firstFridayDate + 7);
+}
+function getFirstFriday(year, month) {
+  const first = new Date(year, month, 1);
+  const firstFridayDate = (5 - first.getDay() + 7) % 7 + 1;
+  return new Date(year, month, firstFridayDate);
+}
+function dateToStr(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
-function calPrev() { calMonth--; if (calMonth < 0) { calMonth = 11; calYear--; } renderCalendar(); }
-function calNext() { calMonth++; if (calMonth > 11) { calMonth = 0; calYear++; } renderCalendar(); }
+function getNextMeetingAlert() {
+  const now = new Date();
+  let year = now.getFullYear();
+  let month = now.getMonth();
+  let secondFri = getSecondFriday(year, month);
+  let firstFri = getFirstFriday(year, month);
+
+  // ÖZEL: Mayıs 2026 — Çorlu Belediye Meclisi sunumu nedeniyle 9 Mayıs'a kadar uzatıldı
+  const extendedEnd = new Date(2026, 4, 9, 23, 59, 59);
+  if (year === 2026 && month === 4 && now <= extendedEnd) {
+    return { showAlert: true, meetingDate: secondFri, meetingDateStr: dateToStr(secondFri),
+             daysUntil: Math.ceil((secondFri - now) / 86400000) };
+  }
+
+  if (now > secondFri) {
+    month++;
+    if (month > 11) { month = 0; year++; }
+    secondFri = getSecondFriday(year, month);
+    firstFri = getFirstFriday(year, month);
+  }
+  const showAlert = now >= firstFri && now <= secondFri;
+  return { showAlert, meetingDate: secondFri, meetingDateStr: dateToStr(secondFri),
+           daysUntil: Math.ceil((secondFri - now) / 86400000) };
+}
+
+// Otomatik aylık toplantıyı veritabanına ekle (yoksa)
+async function ensureScheduledMeeting(meetingDateStr) {
+  const existing = toArray(DATA.meetings).find(m => m.date === meetingDateStr && m.scheduled);
+  if (existing) return existing;
+  // Sadece editör oluşturabilir (yetki kuralı)
+  if (!isEditor()) return null;
+  const meeting = {
+    title: 'Aylık Olağan Toplantı',
+    date: meetingDateStr,
+    time: '18:00',
+    place: 'Çorlu Belediyesi Meclis Salonu',
+    agenda: '1. Açılış\n2. Önceki tutanağın okunması\n3. Komisyon raporları\n4. Gündem maddeleri\n5. Dilek ve temenniler\n6. Kapanış',
+    scheduled: true,
+    createdAt: new Date().toISOString()
+  };
+  const newRef = push(ref(db, 'meetings'));
+  await set(newRef, meeting);
+  return { ...meeting, _key: newRef.key };
+}
+
+function getMyResponse(meetingKey) {
+  const responses = DATA.responses[meetingKey];
+  if (!responses) return null;
+  return responses[currentUser.uid] || null;
+}
+
+async function renderMeetingAlert() {
+  const alert = getNextMeetingAlert();
+  const banner = $('meetingAlert');
+  if (!alert.showAlert || !currentProfile) { banner.style.display = 'none'; return; }
+
+  // Toplantıyı bul (varsa)
+  let meeting = toArray(DATA.meetings).find(m => m.date === alert.meetingDateStr && m.scheduled);
+  if (!meeting) {
+    meeting = await ensureScheduledMeeting(alert.meetingDateStr);
+    if (!meeting) {
+      // Editör değil ve henüz toplantı oluşmamış — basit uyarı göster
+      banner.style.display = 'none';
+      return;
+    }
+  }
+
+  const meetingKey = meeting._key;
+  const response = getMyResponse(meetingKey);
+  const dateStr = `${alert.meetingDate.getDate()} ${MONTHS_TR[alert.meetingDate.getMonth()]} ${alert.meetingDate.getFullYear()} Cuma`;
+  const daysText = alert.daysUntil <= 0 ? 'BUGÜN' : alert.daysUntil === 1 ? 'YARIN' : `${alert.daysUntil} GÜN SONRA`;
+
+  const responses = DATA.responses[meetingKey] || {};
+  const respArr = Object.values(responses);
+  const yesCount = respArr.filter(r => r.status === 'katılıyor').length;
+  const noCount = respArr.filter(r => r.status === 'katılmıyor').length;
+  const pendingCount = memberList().length - respArr.length;
+
+  let responseHTML = '';
+  if (response) {
+    if (response.status === 'katılıyor') {
+      responseHTML = `<div style="background:rgba(30,122,92,0.12); padding:14px 18px; border-radius:10px; display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:16px;">
+        <div style="font-size:13px; color:var(--green); font-weight:600;">✅ Toplantıya katılacağınızı bildirdiniz.</div>
+        <button class="btn-secondary" style="padding:6px 14px; font-size:11px;" onclick="changeResponse('${meetingKey}')">Yanıtı Değiştir</button>
+      </div>`;
+    } else {
+      responseHTML = `<div style="background:rgba(192,57,43,0.08); padding:14px 18px; border-radius:10px; margin-top:16px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:8px;">
+          <div style="font-size:13px; color:var(--red); font-weight:600;">❌ Mazeret bildirildi.</div>
+          <button class="btn-secondary" style="padding:6px 14px; font-size:11px;" onclick="changeResponse('${meetingKey}')">Yanıtı Değiştir</button>
+        </div>
+        <div style="font-size:12px; color:var(--navy); padding:8px 12px; background:var(--white); border-radius:6px; white-space:pre-wrap;">"${response.excuse}"</div>
+      </div>`;
+    }
+  } else {
+    responseHTML = `<div style="display:flex; gap:10px; margin-top:18px; flex-wrap:wrap;">
+      <button class="btn-action" style="background:linear-gradient(135deg, var(--green), #2a9b75); flex:1; min-width:160px;" onclick="respondMeeting('${meetingKey}', 'katılıyor')">✅ Katılacağım</button>
+      <button class="btn-action" style="background:linear-gradient(135deg, var(--red), #d35243); flex:1; min-width:160px;" onclick="respondMeeting('${meetingKey}', 'katılmıyor')">❌ Katılamayacağım</button>
+    </div>`;
+  }
+
+  let adminSummary = '';
+  if (isAdmin()) {
+    adminSummary = `<div style="display:flex; gap:8px; margin-top:14px; flex-wrap:wrap; padding-top:14px; border-top:1px solid rgba(255,255,255,0.1); align-items:center;">
+      <span class="badge badge-green">✅ Katılacak: ${yesCount}</span>
+      <span class="badge badge-red">❌ Mazeret: ${noCount}</span>
+      <span class="badge badge-gray">⏳ Yanıt bekleyen: ${pendingCount}</span>
+      <button class="btn-secondary" style="padding:5px 12px; font-size:11px; margin-left:auto;" onclick="showPage('pending')">Detayları Gör →</button>
+    </div>`;
+  }
+
+  banner.innerHTML = `<div style="background:linear-gradient(135deg, var(--navy), var(--navy-light)); border-radius:14px; padding:24px 28px; color:var(--white); position:relative; overflow:hidden; box-shadow:var(--shadow-lg);">
+    <div style="position:absolute; top:-40px; right:-40px; width:180px; height:180px; background:radial-gradient(circle, rgba(200,168,75,0.2) 0%, transparent 70%); border-radius:50%;"></div>
+    <div style="position:relative; z-index:1;">
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+        <span class="badge badge-gold" style="padding:5px 12px; font-size:11px;">⏰ ${daysText}</span>
+        <span style="font-size:11px; letter-spacing:2px; color:var(--gold); text-transform:uppercase;">Yaklaşan Toplantı</span>
+      </div>
+      <div style="font-family:'Playfair Display', serif; font-size:22px; font-weight:600; margin-bottom:6px;">${meeting.title}</div>
+      <div style="font-size:14px; color:rgba(255,255,255,0.85);">📅 ${dateStr} &nbsp;·&nbsp; 🕐 ${meeting.time} &nbsp;·&nbsp; 📍 ${meeting.place}</div>
+      ${responseHTML}
+      ${adminSummary}
+    </div>
+  </div>`;
+  banner.style.display = 'block';
+}
+
+window.respondMeeting = async function(meetingKey, status) {
+  if (status === 'katılıyor') {
+    try {
+      await set(ref(db, `responses/${meetingKey}/${currentUser.uid}`), {
+        userName: currentProfile.name,
+        status: 'katılıyor',
+        excuse: '',
+        date: new Date().toISOString()
+      });
+      showToast('✅ Katılım kaydedildi!', 'success');
+    } catch (e) { showToast('Hata: ' + e.message, 'error'); }
+  } else {
+    const meeting = DATA.meetings[meetingKey];
+    if (!meeting) return;
+    $('excuseMeetingId').value = meetingKey;
+    $('excuseMeetingTitle').textContent = meeting.title;
+    $('excuseMeetingDate').textContent = `📅 ${formatDate(meeting.date)} · 🕐 ${meeting.time}`;
+    $('excuseText').value = '';
+    openModal('modalExcuse');
+  }
+};
+
+window.saveExcuse = async function() {
+  const meetingKey = $('excuseMeetingId').value;
+  const excuse = $('excuseText').value.trim();
+  if (excuse.length < 10) { showToast('Lütfen en az 10 karakter mazeret yazınız.', 'error'); return; }
+  const btn = $('saveExcuseBtn');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Gönderiliyor...';
+  try {
+    await set(ref(db, `responses/${meetingKey}/${currentUser.uid}`), {
+      userName: currentProfile.name,
+      status: 'katılmıyor',
+      excuse: excuse,
+      date: new Date().toISOString()
+    });
+    closeModal('modalExcuse');
+    showToast('Mazeretiniz iletildi.', 'success');
+  } catch (e) { showToast('Hata: ' + e.message, 'error'); }
+  btn.disabled = false; btn.innerHTML = 'Mazereti Gönder';
+};
+
+window.changeResponse = async function(meetingKey) {
+  if (!confirm('Yanıtınızı değiştirmek istediğinize emin misiniz?')) return;
+  try {
+    await remove(ref(db, `responses/${meetingKey}/${currentUser.uid}`));
+  } catch (e) { showToast('Hata: ' + e.message, 'error'); }
+};
 
 // ═══════════════════════════════════════════════
-// SAVE ACTIONS
+// YANIT BEKLEYENLER (Admin)
 // ═══════════════════════════════════════════════
+function renderPending() {
+  const el = $('pendingContent');
+  const alert = getNextMeetingAlert();
+  if (!alert.showAlert) {
+    el.innerHTML = `<div class="card"><div class="card-body"><div class="empty-state">
+      <div class="empty-state-icon">📅</div>
+      <div class="empty-state-text" style="font-size:15px; margin-bottom:8px;">Aktif yaklaşan toplantı yok</div>
+      <div style="font-size:12px; color:var(--gray); max-width:400px; margin:0 auto;">Yanıt takibi her ayın 1. cuması başlar, 2. cuma sona erer.</div>
+    </div></div></div>`;
+    return;
+  }
+  const meeting = toArray(DATA.meetings).find(m => m.date === alert.meetingDateStr && m.scheduled);
+  if (!meeting) {
+    el.innerHTML = `<div class="card"><div class="card-body"><div class="empty-state">
+      <div class="empty-state-icon">⏳</div>
+      <div class="empty-state-text">Toplantı henüz oluşturulmadı.</div>
+    </div></div></div>`;
+    return;
+  }
+  const meetingKey = meeting._key;
+  const responses = DATA.responses[meetingKey] || {};
+  const respArr = Object.keys(responses).map(uid => ({ ...responses[uid], uid }));
+  const respondedUids = respArr.map(r => r.uid);
+  const members = memberList();
+  const pending = members.filter(m => !respondedUids.includes(m._key));
+  const yesR = respArr.filter(r => r.status === 'katılıyor');
+  const noR = respArr.filter(r => r.status === 'katılmıyor');
+  const responseRate = members.length ? Math.round(((members.length - pending.length) / members.length) * 100) : 0;
+  const meetingDate = new Date(meeting.date);
+  const dateStr = `${meetingDate.getDate()} ${MONTHS_TR[meetingDate.getMonth()]} ${meetingDate.getFullYear()} Cuma`;
 
-function saveMeeting() {
-  const title = document.getElementById('mtgTitle').value.trim();
-  const date = document.getElementById('mtgDate').value;
-  const time = document.getElementById('mtgTime').value;
-  const place = document.getElementById('mtgPlace').value.trim();
-  const agenda = document.getElementById('mtgAgenda').value;
+  let html = `<div style="background:linear-gradient(135deg, var(--navy), var(--navy-light)); border-radius:14px; padding:24px 28px; color:var(--white); margin-bottom:24px; box-shadow:var(--shadow);">
+    <div style="font-size:11px; letter-spacing:2px; color:var(--gold); text-transform:uppercase; margin-bottom:8px;">Yaklaşan Toplantı</div>
+    <div style="font-family:'Playfair Display', serif; font-size:22px; font-weight:600; margin-bottom:6px;">${meeting.title}</div>
+    <div style="font-size:14px; color:rgba(255,255,255,0.85);">📅 ${dateStr} · 🕐 ${meeting.time} · 📍 ${meeting.place}</div>
+  </div>
+  <div class="stats-grid" style="grid-template-columns: repeat(4, 1fr);">
+    <div class="stat-card" data-icon="👥"><div class="stat-label">Toplam Üye</div><div class="stat-value">${members.length}</div></div>
+    <div class="stat-card" data-icon="✅" style="border-left-color: var(--green)"><div class="stat-label">Katılacak</div><div class="stat-value" style="color:var(--green);">${yesR.length}</div></div>
+    <div class="stat-card" data-icon="❌" style="border-left-color: var(--red)"><div class="stat-label">Mazeretli</div><div class="stat-value" style="color:var(--red);">${noR.length}</div></div>
+    <div class="stat-card" data-icon="⏳" style="border-left-color: var(--gold)"><div class="stat-label">Yanıt Bekleyen</div><div class="stat-value" style="color:#8a6a1a;">${pending.length}</div><div class="stat-sub">Yanıt oranı: %${responseRate}</div></div>
+  </div>`;
+
+  // Yanıt vermeyenler
+  html += `<div class="card" style="margin-bottom:20px;"><div class="card-header"><div class="card-title">⏳ Yanıt Vermeyen Üyeler (${pending.length})</div></div><div class="card-body">`;
+  if (!pending.length) {
+    html += `<div class="empty-state" style="padding:40px 20px;"><div class="empty-state-icon">🎉</div><div class="empty-state-text" style="font-size:15px; color:var(--green); font-weight:600;">Tüm üyeler yanıt verdi!</div></div>`;
+  } else {
+    html += `<div class="table-wrap"><table><thead><tr><th>Üye</th><th>Rol</th><th>İletişim</th><th>İşlem</th></tr></thead><tbody>`;
+    html += pending.map(m => `<tr>
+      <td><div style="display:flex; align-items:center; gap:10px;"><div class="user-avatar" style="width:36px; height:36px; font-size:13px; background:var(--navy-light);">${initials(m.name)}</div><strong>${m.name}</strong></div></td>
+      <td><span class="badge ${roleBadge(m.role)}">${m.role}</span></td>
+      <td><div style="font-size:12px;">${m.email}</div><div style="font-size:11px; color:var(--gray);">${m.phone || ''}</div></td>
+      <td><div style="display:flex; gap:6px;">
+        ${m.phone ? `<a href="tel:${m.phone.replace(/\s/g,'')}" class="btn-action" style="padding:5px 12px; font-size:11px; text-decoration:none;">📞 Ara</a>` : ''}
+        ${m.phone ? `<a href="https://wa.me/9${m.phone.replace(/\s/g,'')}?text=${encodeURIComponent('Sayın ' + m.name.split(' ')[0] + ', ' + dateStr + ' tarihindeki toplantıya katılım durumunuzu sistemden bildirmenizi rica ederiz.')}" target="_blank" class="btn-action" style="padding:5px 12px; font-size:11px; background:linear-gradient(135deg, #25D366, #128C7E); text-decoration:none;">💬 WhatsApp</a>` : ''}
+      </div></td>
+    </tr>`).join('');
+    html += `</tbody></table></div>`;
+  }
+  html += `</div></div>`;
+
+  // Mazeretler
+  if (noR.length) {
+    html += `<div class="card" style="margin-bottom:20px;"><div class="card-header"><div class="card-title">❌ Mazeret Bildirenler (${noR.length})</div></div><div class="card-body">`;
+    html += noR.map(r => `<div style="background:rgba(192,57,43,0.06); padding:14px 16px; border-radius:8px; margin-bottom:10px; border-left:3px solid var(--red);">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
+        <strong style="font-size:13px;">${r.userName}</strong>
+        <span style="font-size:11px; color:var(--gray);">📅 ${formatDate((r.date||'').split('T')[0])}</span>
+      </div>
+      <div style="font-size:13px; color:var(--navy); white-space:pre-wrap; padding:10px 12px; background:var(--white); border-radius:6px;">"${r.excuse}"</div>
+    </div>`).join('');
+    html += `</div></div>`;
+  }
+
+  // Katılacaklar
+  if (yesR.length) {
+    html += `<div class="card"><div class="card-header"><div class="card-title">✅ Katılacaklar (${yesR.length})</div></div><div class="card-body">
+      <div style="display:flex; flex-wrap:wrap; gap:8px;">${yesR.map(r => `<span class="badge badge-green" style="padding:7px 14px; font-size:12px;">${r.userName}</span>`).join('')}</div>
+    </div></div>`;
+  }
+  el.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════
+// KATILIM ANALİZİ (Admin)
+// ═══════════════════════════════════════════════
+function renderAnalytics() {
+  const today = new Date().toISOString().split('T')[0];
+  const pastMeetings = toArray(DATA.meetings).filter(m => m.date <= today);
+  const totalPast = pastMeetings.length;
+  $('anStatTotal').textContent = totalPast;
+
+  const members = memberList();
+  const attendance = members.map(m => {
+    let attended = 0;
+    pastMeetings.forEach(mtg => {
+      const resp = DATA.responses[mtg._key] && DATA.responses[mtg._key][m._key];
+      if (resp && resp.status === 'katılıyor') attended++;
+    });
+    const rate = totalPast > 0 ? Math.round((attended / totalPast) * 100) : 0;
+    return { ...m, attended, total: totalPast, rate };
+  }).sort((a,b) => b.rate - a.rate || b.attended - a.attended);
+
+  const avgRate = attendance.length ? Math.round(attendance.reduce((s,m) => s+m.rate, 0) / attendance.length) : 0;
+  $('anStatAvg').textContent = avgRate + '%';
+
+  if (attendance.length && attendance[0].attended > 0) {
+    $('anStatTop').textContent = attendance[0].name;
+    $('anStatTopSub').textContent = `${attendance[0].attended}/${totalPast} toplantı (%${attendance[0].rate})`;
+  } else {
+    $('anStatTop').textContent = '-';
+    $('anStatTopSub').textContent = 'Veri yok';
+  }
+
+  const tbl = $('analyticsTable');
+  if (!attendance.length) {
+    tbl.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--gray); padding:32px;">Veri yok</td></tr>';
+  } else {
+    tbl.innerHTML = attendance.map((m, idx) => {
+      let sb = m.rate >= 80 ? '<span class="badge badge-green">Mükemmel</span>'
+        : m.rate >= 60 ? '<span class="badge badge-gold">İyi</span>'
+        : m.rate >= 40 ? '<span class="badge badge-navy">Orta</span>'
+        : '<span class="badge badge-red">Düşük</span>';
+      const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx+1}.`;
+      return `<tr>
+        <td><strong style="font-size:14px;">${medal}</strong></td>
+        <td><div style="display:flex; align-items:center; gap:10px;"><div class="user-avatar" style="width:32px; height:32px; font-size:12px; background:var(--navy-light);">${initials(m.name)}</div><strong>${m.name}</strong></div></td>
+        <td><span class="badge ${roleBadge(m.role)}">${m.role}</span></td>
+        <td><strong>${m.attended}</strong> / ${m.total}</td>
+        <td><div style="display:flex; align-items:center; gap:10px;">
+          <div style="flex:1; max-width:140px; height:8px; background:var(--gray-light); border-radius:4px; overflow:hidden;">
+            <div style="height:100%; background:linear-gradient(90deg, var(--navy), var(--navy-light)); width:${m.rate}%;"></div>
+          </div><strong style="min-width:42px;">%${m.rate}</strong>
+        </div></td>
+        <td>${sb}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  const mt = $('meetingAttendanceTable');
+  if (!pastMeetings.length) {
+    mt.innerHTML = '<tr><td colspan="4" style="text-align:center; color:var(--gray); padding:32px;">Geçmiş toplantı yok</td></tr>';
+  } else {
+    const totalMembers = members.length;
+    mt.innerHTML = [...pastMeetings].sort((a,b) => b.date.localeCompare(a.date)).map(m => {
+      const resp = DATA.responses[m._key] || {};
+      const count = Object.values(resp).filter(r => r.status === 'katılıyor').length;
+      const rate = totalMembers ? Math.round((count / totalMembers) * 100) : 0;
+      return `<tr>
+        <td><strong>${m.title}</strong></td>
+        <td style="font-size:12px;">${formatDate(m.date)}</td>
+        <td><strong>${count}</strong> / ${totalMembers} kişi</td>
+        <td><div style="display:flex; align-items:center; gap:10px;">
+          <div style="flex:1; max-width:140px; height:8px; background:var(--gray-light); border-radius:4px; overflow:hidden;">
+            <div style="height:100%; background:linear-gradient(90deg, var(--gold), var(--gold-light)); width:${rate}%;"></div>
+          </div><strong style="min-width:42px;">%${rate}</strong>
+        </div></td>
+      </tr>`;
+    }).join('');
+  }
+}
+
+// ═══════════════════════════════════════════════
+// YÖNETİM PANELİ (Admin)
+// ═══════════════════════════════════════════════
+function renderAdmin() {
+  $('adStatM').textContent = memberList().length;
+  $('adStatT').textContent = toArray(DATA.meetings).length;
+  $('adStatN').textContent = toArray(DATA.notes).length;
+  $('adStatA').textContent = toArray(DATA.announcements).length;
+
+  const mt = $('adminMembersTable');
+  const members = memberList();
+  if (!members.length) {
+    mt.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--gray); padding:32px;">Üye yok</td></tr>';
+    return;
+  }
+  mt.innerHTML = members.map(m => `<tr>
+    <td><div style="display:flex; align-items:center; gap:10px;"><div class="user-avatar" style="width:32px; height:32px; font-size:12px; background:var(--navy-light);">${initials(m.name)}</div><strong>${m.name}</strong></div></td>
+    <td><span class="badge ${roleBadge(m.role)}">${m.role}</span></td>
+    <td style="font-size:12px;">${m.email}</td>
+    <td style="font-size:12px;">${m.phone || ''}</td>
+    <td><span class="badge badge-green">aktif</span></td>
+    <td><div style="display:flex; gap:6px;">
+      <button class="btn-action" style="padding:5px 12px; font-size:11px;" onclick="openEditMember('${m._key}')">✏️ Düzenle</button>
+      ${m._key !== currentUser.uid ? `<button class="btn-danger" style="padding:5px 10px; font-size:11px;" onclick="deleteMember('${m._key}')">Sil</button>` : ''}
+    </div></td>
+  </tr>`).join('');
+}
+
+window.openEditMember = function(key) {
+  const m = DATA.members[key];
+  if (!m) return;
+  const parts = (m.name || '').split(' ');
+  $('editMemId').value = key;
+  $('editMemFirst').value = parts[0] || '';
+  $('editMemLast').value = parts.slice(1).join(' ') || '';
+  $('editMemEmail').value = m.email || '';
+  $('editMemPhone').value = m.phone || '';
+  $('editMemRole').value = m.role || 'Üye';
+  $('editMemStatus').value = m.status === 'pasif' ? 'pasif' : 'aktif';
+  openModal('modalEditMember');
+};
+
+window.saveEditMember = async function() {
+  const key = $('editMemId').value;
+  const first = $('editMemFirst').value.trim();
+  const last = $('editMemLast').value.trim();
+  if (!first) { showToast('Ad zorunludur.', 'error'); return; }
+  const btn = $('saveEditMemBtn');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
+  try {
+    await update(ref(db, 'members/' + key), {
+      name: `${first} ${last}`.trim(),
+      phone: $('editMemPhone').value.trim(),
+      role: $('editMemRole').value,
+      status: $('editMemStatus').value
+    });
+    closeModal('modalEditMember');
+    showToast('Üye bilgileri güncellendi!', 'success');
+  } catch (e) { showToast('Hata: ' + e.message, 'error'); }
+  btn.disabled = false; btn.innerHTML = 'Kaydet';
+};
+
+window.deleteMember = async function(key) {
+  if (!confirm('Bu üyeyi silmek istediğinize emin misiniz? (Giriş hesabı korunur, sadece üyelikten çıkarılır)')) return;
+  try {
+    // Profili "pasif/silinmiş" yap (Auth hesabı client'tan silinemez)
+    await update(ref(db, 'members/' + key), { status: 'silindi' });
+    showToast('Üye listeden çıkarıldı.', 'success');
+  } catch (e) { showToast('Hata: ' + e.message, 'error'); }
+};
+
+// ═══════════════════════════════════════════════
+// KAYDETME İŞLEMLERİ
+// ═══════════════════════════════════════════════
+window.saveMeeting = async function() {
+  const title = $('mtgTitle').value.trim();
+  const date = $('mtgDate').value;
   if (!title || !date) { showToast('Başlık ve tarih zorunludur.', 'error'); return; }
-  const d = getData();
-  const attendees = [...document.querySelectorAll('#mtgAttendees input:checked')].map(el => parseInt(el.value));
-  const id = Date.now();
-  d.meetings.push({ id, title, date, time, place, agenda, attendees });
-  saveData(d);
-  closeModal('modalMeeting');
-  renderAll();
-  showToast('Toplantı eklendi!', 'success');
-  document.getElementById('mtgTitle').value = '';
-  document.getElementById('mtgDate').value = '';
-  document.getElementById('mtgAgenda').value = '';
-  document.getElementById('mtgPlace').value = '';
-}
+  const btn = $('saveMeetingBtn');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
+  try {
+    await set(push(ref(db, 'meetings')), {
+      title, date,
+      time: $('mtgTime').value || '18:00',
+      place: $('mtgPlace').value.trim() || 'Çorlu Belediyesi Meclis Salonu',
+      agenda: $('mtgAgenda').value,
+      createdBy: currentProfile.name,
+      createdAt: new Date().toISOString()
+    });
+    closeModal('modalMeeting');
+    showToast('Toplantı eklendi!', 'success');
+    ['mtgTitle','mtgDate','mtgAgenda'].forEach(id => $(id).value = '');
+  } catch (e) { showToast('Hata: ' + e.message, 'error'); }
+  btn.disabled = false; btn.innerHTML = 'Kaydet';
+};
 
-function saveNote() {
-  const title = document.getElementById('noteTitle').value.trim();
-  const body = document.getElementById('noteBody').value.trim();
-  const meetingId = parseInt(document.getElementById('noteMeeting').value) || null;
-  const status = document.getElementById('noteStatus').value;
+window.saveNote = async function() {
+  const title = $('noteTitle').value.trim();
   if (!title) { showToast('Başlık zorunludur.', 'error'); return; }
-  const d = getData();
-  d.notes.push({ id: Date.now(), title, meetingId, body, status, author: currentUser.name, date: new Date().toISOString().split('T')[0] });
-  saveData(d);
-  closeModal('modalNote');
-  renderAll();
-  showToast('Tutanak kaydedildi!', 'success');
-  document.getElementById('noteTitle').value = '';
-  document.getElementById('noteBody').value = '';
-}
+  const btn = $('saveNoteBtn');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
+  try {
+    await set(push(ref(db, 'notes')), {
+      title,
+      meetingKey: $('noteMeeting').value || null,
+      body: $('noteBody').value.trim(),
+      status: $('noteStatus').value,
+      author: currentProfile.name,
+      date: new Date().toISOString().split('T')[0]
+    });
+    closeModal('modalNote');
+    showToast('Tutanak kaydedildi!', 'success');
+    $('noteTitle').value = ''; $('noteBody').value = '';
+  } catch (e) { showToast('Hata: ' + e.message, 'error'); }
+  btn.disabled = false; btn.innerHTML = 'Kaydet';
+};
 
-function saveMember() {
-  const first = document.getElementById('memFirst').value.trim();
-  const last = document.getElementById('memLast').value.trim();
-  const email = document.getElementById('memEmail').value.trim();
-  const phone = document.getElementById('memPhone').value.trim();
-  const role = document.getElementById('memRole').value;
-  if (!first || !last) { showToast('Ad ve soyad zorunludur.', 'error'); return; }
-  const d = getData();
-  d.members.push({ id: Date.now(), name: `${first} ${last}`, email, phone, role, status: 'aktif' });
-  saveData(d);
-  closeModal('modalMember');
-  renderAll();
-  showToast('Üye eklendi!', 'success');
-  ['memFirst','memLast','memEmail','memPhone'].forEach(id => document.getElementById(id).value = '');
-}
-
-function saveAnnouncement() {
-  const title = document.getElementById('annTitle').value.trim();
-  const body = document.getElementById('annBody').value.trim();
-  const priority = document.getElementById('annPriority').value;
+window.saveAnnouncement = async function() {
+  const title = $('annTitle').value.trim();
   if (!title) { showToast('Başlık zorunludur.', 'error'); return; }
-  const d = getData();
-  d.announcements.push({ id: Date.now(), title, body, priority, author: currentUser.name, date: new Date().toISOString().split('T')[0] });
-  saveData(d);
-  closeModal('modalAnnouncement');
-  renderAll();
-  showToast('Duyuru yayınlandı!', 'success');
-  document.getElementById('annTitle').value = '';
-  document.getElementById('annBody').value = '';
-}
+  const btn = $('saveAnnBtn');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
+  try {
+    await set(push(ref(db, 'announcements')), {
+      title,
+      body: $('annBody').value.trim(),
+      priority: $('annPriority').value,
+      author: currentProfile.name,
+      date: new Date().toISOString().split('T')[0]
+    });
+    closeModal('modalAnnouncement');
+    showToast('Duyuru yayınlandı!', 'success');
+    $('annTitle').value = ''; $('annBody').value = '';
+  } catch (e) { showToast('Hata: ' + e.message, 'error'); }
+  btn.disabled = false; btn.innerHTML = 'Yayınla';
+};
 
-// ═══════════════════════════════════════════════
-// DELETE
-// ═══════════════════════════════════════════════
-
-function deleteMember(id) {
-  if (!confirm('Bu üyeyi silmek istediğinize emin misiniz?')) return;
-  const d = getData(); d.members = d.members.filter(m => m.id !== id);
-  saveData(d); renderAll(); showToast('Üye silindi.', 'success');
-}
-
-function deleteAnnouncement(id) {
+window.deleteAnnouncement = async function(key) {
   if (!confirm('Bu duyuruyu silmek istediğinize emin misiniz?')) return;
-  const d = getData(); d.announcements = d.announcements.filter(a => a.id !== id);
-  saveData(d); renderAll(); showToast('Duyuru silindi.', 'success');
+  try {
+    await remove(ref(db, 'announcements/' + key));
+    showToast('Duyuru silindi.', 'success');
+  } catch (e) { showToast('Hata: ' + e.message, 'error'); }
+};
+
+// ═══════════════════════════════════════════════
+// DERGİ (Firebase Storage)
+// ═══════════════════════════════════════════════
+function renderMagazine() {
+  if (!$('featuredMagazine')) return;
+  const all = toArray(DATA.magazines).sort((a,b) => (b.year - a.year) || (b.month - a.month));
+  const featuredEl = $('featuredMagazine');
+  const archiveEl = $('magazineArchive');
+
+  // Modal yıl seçenekleri
+  const yearSel = $('magYear');
+  if (yearSel) {
+    const cy = new Date().getFullYear();
+    yearSel.innerHTML = '';
+    for (let y = cy + 1; y >= cy - 3; y--) {
+      yearSel.innerHTML += `<option value="${y}" ${y === cy ? 'selected' : ''}>${y}</option>`;
+    }
+    $('magMonth').value = new Date().getMonth();
+  }
+
+  if (!all.length) {
+    featuredEl.innerHTML = `<div class="card"><div class="card-body"><div class="empty-state" style="padding:48px 20px;">
+      <div class="empty-state-icon">📖</div>
+      <div class="empty-state-text" style="font-size:15px; margin-bottom:8px;">Henüz dergi yüklenmedi</div>
+      <div style="font-size:12px; color:var(--gray); max-width:380px; margin:0 auto;">Aylık dergi sayılarınızı PDF olarak yükleyebilirsiniz.</div>
+      ${isEditor() ? `<button class="btn-action" style="margin-top:20px;" onclick="openModal('modalMagazine')">+ İlk Sayıyı Yükle</button>` : ''}
+    </div></div></div>`;
+    archiveEl.innerHTML = '';
+    return;
+  }
+
+  const f = all[0];
+  featuredEl.innerHTML = `<div style="background:linear-gradient(135deg, var(--navy), var(--navy-light)); border-radius:14px; padding:32px; color:var(--white); position:relative; overflow:hidden; box-shadow:var(--shadow-lg);">
+    <div style="position:absolute; top:-60px; right:-60px; width:240px; height:240px; background:radial-gradient(circle, rgba(200,168,75,0.18) 0%, transparent 70%); border-radius:50%;"></div>
+    <div style="position:relative; z-index:1; display:flex; gap:32px; align-items:center; flex-wrap:wrap;">
+      <div style="flex-shrink:0;">
+        ${f.coverUrl
+          ? `<img src="${f.coverUrl}" style="width:180px; max-height:260px; border-radius:10px; box-shadow:0 12px 40px rgba(0,0,0,0.4);">`
+          : `<div style="width:180px; height:240px; background:linear-gradient(135deg, var(--gold), var(--gold-light)); border-radius:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; box-shadow:0 12px 40px rgba(0,0,0,0.4); color:var(--navy);">
+              <div style="font-size:48px; margin-bottom:8px;">📖</div>
+              <div style="font-family:'Playfair Display', serif; font-size:18px; font-weight:600; text-align:center;">Gençlik<br>Meclisi</div>
+              <div style="font-size:10px; letter-spacing:2px; margin-top:8px; opacity:0.7;">${MONTHS_TR[f.month].toUpperCase()} ${f.year}</div>
+            </div>`}
+      </div>
+      <div style="flex:1; min-width:240px;">
+        <div style="font-size:11px; letter-spacing:2px; color:var(--gold); text-transform:uppercase; margin-bottom:8px;">📌 Bu Ayın Dergisi</div>
+        <div style="font-family:'Playfair Display', serif; font-size:32px; font-weight:700; line-height:1.1; margin-bottom:6px;">${MONTHS_TR[f.month]} ${f.year}</div>
+        ${f.issue ? `<div style="font-size:14px; color:var(--gold); margin-bottom:14px;">${f.issue}</div>` : '<div style="margin-bottom:14px;"></div>'}
+        ${f.desc ? `<div style="font-size:14px; color:rgba(255,255,255,0.85); line-height:1.6; margin-bottom:20px;">${f.desc}</div>` : ''}
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+          <a href="${f.pdfUrl}" target="_blank" class="btn-action btn-gold" style="text-decoration:none;">📖 Oku</a>
+          <a href="${f.pdfUrl}" download class="btn-action" style="background:rgba(255,255,255,0.15); text-decoration:none;">⬇️ İndir</a>
+          ${isEditor() ? `<button class="btn-action" style="background:rgba(192,57,43,0.4);" onclick="deleteMagazine('${f._key}')">🗑️</button>` : ''}
+        </div>
+        <div style="font-size:11px; color:rgba(255,255,255,0.55); margin-top:18px;">✍️ ${f.uploadedBy} · 📅 ${formatDate(f.uploadDate)}</div>
+      </div>
+    </div>
+  </div>`;
+
+  const archive = all.slice(1);
+  if (!archive.length) {
+    archiveEl.innerHTML = `<div style="text-align:center; padding:32px 16px; color:var(--gray); font-size:13px;">Geçmiş sayı yok.</div>`;
+  } else {
+    archiveEl.innerHTML = `<div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:16px;">` +
+      archive.map(m => `<div style="background:var(--white); border:1.5px solid var(--gray-light); border-radius:12px; overflow:hidden;">
+        ${m.coverUrl
+          ? `<img src="${m.coverUrl}" style="width:100%; height:180px; object-fit:cover; display:block;">`
+          : `<div style="width:100%; height:180px; background:linear-gradient(135deg, var(--cream), #e8e0c8); display:flex; flex-direction:column; align-items:center; justify-content:center; color:var(--navy);">
+              <div style="font-size:36px; margin-bottom:6px;">📖</div><div style="font-size:11px; letter-spacing:1px;">${MONTHS_TR[m.month].toUpperCase()}</div>
+            </div>`}
+        <div style="padding:14px;">
+          <div style="font-family:'Playfair Display', serif; font-size:15px; font-weight:600; color:var(--navy);">${MONTHS_TR[m.month]} ${m.year}</div>
+          ${m.issue ? `<div style="font-size:11px; color:var(--gray); margin-top:2px;">${m.issue}</div>` : ''}
+          <div style="display:flex; gap:6px; margin-top:10px;">
+            <a href="${m.pdfUrl}" target="_blank" class="btn-action" style="padding:5px 10px; font-size:11px; flex:1; text-decoration:none; text-align:center;">📖 Oku</a>
+            <a href="${m.pdfUrl}" download class="btn-secondary" style="padding:5px 10px; font-size:11px; text-decoration:none;">⬇️</a>
+            ${isEditor() ? `<button class="btn-danger" style="padding:5px 8px; font-size:11px;" onclick="deleteMagazine('${m._key}')">🗑️</button>` : ''}
+          </div>
+        </div>
+      </div>`).join('') + `</div>`;
+  }
 }
 
-// ═══════════════════════════════════════════════
-// MODALS
-// ═══════════════════════════════════════════════
+window.saveMagazine = async function() {
+  const year = parseInt($('magYear').value);
+  const month = parseInt($('magMonth').value);
+  const pdfFile = $('magPdfFile').files[0];
+  const coverFile = $('magCoverFile').files[0];
 
-function openModal(id) {
+  if (!pdfFile) { showToast('Lütfen bir PDF dosyası seçin.', 'error'); return; }
+  if (pdfFile.type !== 'application/pdf') { showToast('Sadece PDF yükleyebilirsiniz.', 'error'); return; }
+
+  const btn = $('saveMagBtn');
+  btn.disabled = true;
+  const progEl = $('magUploadProgress');
+  progEl.style.display = 'block';
+  progEl.innerHTML = `<div class="info-box blue">📤 PDF yükleniyor... <span id="upPct">0%</span></div>`;
+
+  try {
+    const magId = Date.now().toString();
+    // PDF yükle
+    const pdfRef = sRef(storage, `magazines/${magId}/${pdfFile.name}`);
+    const uploadTask = uploadBytesResumable(pdfRef, pdfFile);
+
+    await new Promise((resolve, reject) => {
+      uploadTask.on('state_changed',
+        snap => {
+          const pct = Math.round((snap.bytesTransferred / snap.totalBytes) * 100);
+          const pctEl = $('upPct');
+          if (pctEl) pctEl.textContent = pct + '%';
+        },
+        err => reject(err),
+        () => resolve()
+      );
+    });
+    const pdfUrl = await getDownloadURL(pdfRef);
+
+    // Kapak yükle (opsiyonel)
+    let coverUrl = null;
+    if (coverFile) {
+      progEl.innerHTML = `<div class="info-box blue">📤 Kapak görseli yükleniyor...</div>`;
+      const coverRef = sRef(storage, `magazines/${magId}/cover_${coverFile.name}`);
+      await uploadBytesResumable(coverRef, coverFile);
+      coverUrl = await getDownloadURL(coverRef);
+    }
+
+    // Veritabanına kaydet
+    await set(ref(db, 'magazines/' + magId), {
+      year, month,
+      issue: $('magIssue').value.trim(),
+      desc: $('magDesc').value.trim(),
+      pdfUrl, coverUrl,
+      fileName: pdfFile.name,
+      uploadedBy: currentProfile.name,
+      uploadDate: new Date().toISOString().split('T')[0]
+    });
+
+    closeModal('modalMagazine');
+    showToast('Dergi yayınlandı!', 'success');
+    ['magIssue','magDesc','magPdfFile','magCoverFile'].forEach(id => $(id).value = '');
+    progEl.style.display = 'none';
+  } catch (e) {
+    console.error(e);
+    progEl.innerHTML = `<div class="info-box red">⚠️ Yükleme hatası: ${e.message}</div>`;
+  }
+  btn.disabled = false;
+};
+
+window.deleteMagazine = async function(key) {
+  if (!confirm('Bu dergi sayısını silmek istediğinize emin misiniz?')) return;
+  try {
+    await remove(ref(db, 'magazines/' + key));
+    showToast('Dergi silindi.', 'success');
+  } catch (e) { showToast('Hata: ' + e.message, 'error'); }
+};
+
+// ═══════════════════════════════════════════════
+// MODAL YÖNETİMİ
+// ═══════════════════════════════════════════════
+window.openModal = function(id) {
   if (id === 'modalNote') {
-    const d = getData();
-    const sel = document.getElementById('noteMeeting');
-    sel.innerHTML = '<option value="">-- Toplantı Seçin --</option>' + d.meetings.map(m => `<option value="${m.id}">${m.title}</option>`).join('');
+    const sel = $('noteMeeting');
+    sel.innerHTML = '<option value="">-- Toplantı Seçin --</option>' +
+      toArray(DATA.meetings).map(m => `<option value="${m._key}">${m.title}</option>`).join('');
   }
-  if (id === 'modalMeeting') {
-    const d = getData();
-    document.getElementById('mtgAttendees').innerHTML = d.members.map(m =>
-      `<div class="attendee-check"><input type="checkbox" value="${m.id}" id="att_${m.id}" checked><label for="att_${m.id}">${m.name} <span style="color:var(--gray);font-size:11px;">(${m.role})</span></label></div>`
-    ).join('');
-  }
-  document.getElementById(id).classList.add('open');
-}
-
-function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+  $(id).classList.add('open');
+};
+window.closeModal = function(id) { $(id).classList.remove('open'); };
 
 document.querySelectorAll('.modal-overlay').forEach(el => {
   el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); });
 });
 
-// ═══════════════════════════════════════════════
-// HELPERS
-// ═══════════════════════════════════════════════
+// Enter tuşu ile giriş
+$('loginPassword').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+$('loginEmail').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 
-function showToast(msg, type = 'success') {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.className = `toast ${type} show`;
-  setTimeout(() => t.classList.remove('show'), 3000);
-}
-
-function formatDate(ds) {
-  if (!ds) return '';
-  const d = new Date(ds);
-  return `${d.getDate()} ${['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'][d.getMonth()]} ${d.getFullYear()}`;
-}
-
-// Enter key on login
-document.getElementById('loginPassword').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
-document.getElementById('loginEmail').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 </script>
 </body>
 </html>

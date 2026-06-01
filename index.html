@@ -1077,6 +1077,7 @@ tbody tr:last-child td { border-bottom: none; }
       <div class="nav-item" onclick="showPage('notes')"><span class="nav-icon">📝</span> Tutanaklar</div>
       <div class="nav-section-title">Meclis</div>
       <div class="nav-item" onclick="showPage('members')"><span class="nav-icon">👥</span> Üyeler</div>
+      <div class="nav-item" onclick="showPage('committees')"><span class="nav-icon">🏛️</span> Komisyonlar</div>
       <div class="nav-item" onclick="showPage('announcements')"><span class="nav-icon">📢</span> Duyurular</div>
       <div class="nav-item" onclick="showPage('magazine')"><span class="nav-icon">📖</span> Dergi</div>
       <div class="nav-section-title admin-only" id="adminNavSection">Yönetim</div>
@@ -1218,6 +1219,18 @@ tbody tr:last-child td { border-bottom: none; }
           </div>
         </div>
       </div>
+    </div>
+
+    <!-- COMMITTEES -->
+    <div id="page-committees" class="page">
+      <div class="page-header">
+        <div>
+          <div class="page-title">🏛️ Komisyonlar</div>
+          <div class="page-subtitle">Çalışma komisyonları ve üyeleri.</div>
+        </div>
+        <button class="btn-action admin-only" onclick="openAddCommittee()">+ Yeni Komisyon</button>
+      </div>
+      <div id="committeesContent"></div>
     </div>
 
     <!-- ANNOUNCEMENTS -->
@@ -1544,6 +1557,57 @@ tbody tr:last-child td { border-bottom: none; }
   </div>
 </div>
 
+<!-- Komisyon Ekle/Düzenle -->
+<div class="modal-overlay" id="modalCommittee">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="committeeModalTitle">Yeni Komisyon</div>
+      <button class="modal-close" onclick="closeModal('modalCommittee')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="committeeId">
+      <div class="form-group">
+        <label>Komisyon Adı</label>
+        <input type="text" id="committeeName" placeholder="Örn: Eğitim Komisyonu">
+      </div>
+      <div class="form-group">
+        <label>Açıklama (opsiyonel)</label>
+        <textarea class="note-editor" id="committeeDesc" placeholder="Bu komisyonun amacı ve çalışma alanı..." style="min-height:80px;"></textarea>
+      </div>
+      <div class="form-group">
+        <label>Renk</label>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;" id="committeeColorPicker"></div>
+        <input type="hidden" id="committeeColor" value="navy">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('modalCommittee')">İptal</button>
+      <button class="btn-action" id="saveCommitteeBtn" onclick="saveCommittee()">Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<!-- Komisyon Üye Atama -->
+<div class="modal-overlay" id="modalCommitteeMembers">
+  <div class="modal" style="max-width:520px;">
+    <div class="modal-header">
+      <div class="modal-title" id="committeeMembersTitle">Komisyon Üyeleri</div>
+      <button class="modal-close" onclick="closeModal('modalCommitteeMembers')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="assignCommitteeId">
+      <div style="font-size:12px; color:var(--gray); margin-bottom:14px;">
+        Bu komisyona dahil olacak üyeleri işaretleyin.
+      </div>
+      <div id="committeeMembersList" style="max-height:380px; overflow-y:auto;"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('modalCommitteeMembers')">İptal</button>
+      <button class="btn-action" id="saveCommitteeMembersBtn" onclick="saveCommitteeMembers()">Kaydet</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
@@ -1584,7 +1648,7 @@ const storage = getStorage(app);
 // ═══════════════════════════════════════════════
 let currentUser = null;     // Firebase auth kullanıcısı
 let currentProfile = null;  // Database'deki üye profili
-let DATA = { members: {}, meetings: {}, notes: {}, announcements: {}, responses: {}, magazines: {} };
+let DATA = { members: {}, meetings: {}, notes: {}, announcements: {}, responses: {}, magazines: {}, committees: {} };
 
 const MONTHS_TR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
 const DAYS_TR = ['Pzt','Sal','Çar','Per','Cum','Cmt','Paz'];
@@ -1839,6 +1903,7 @@ function startDataListeners() {
   onValue(ref(db, 'announcements'), snap => { DATA.announcements = snap.val() || {}; renderAll(); });
   onValue(ref(db, 'responses'), snap => { DATA.responses = snap.val() || {}; renderAll(); });
   onValue(ref(db, 'magazines'), snap => { DATA.magazines = snap.val() || {}; renderMagazine(); });
+  onValue(ref(db, 'committees'), snap => { DATA.committees = snap.val() || {}; renderAll(); });
 }
 
 // ═══════════════════════════════════════════════
@@ -1858,6 +1923,7 @@ window.showPage = function(p) {
   if (p === 'pending') renderPending();
   if (p === 'approvals') renderApprovals();
   if (p === 'magazine') renderMagazine();
+  if (p === 'committees') renderCommittees();
 };
 
 // ═══════════════════════════════════════════════
@@ -1880,6 +1946,7 @@ function renderAll() {
   if ($('page-analytics').classList.contains('active')) renderAnalytics();
   if ($('page-pending').classList.contains('active')) renderPending();
   if ($('page-approvals').classList.contains('active')) renderApprovals();
+  if ($('page-committees').classList.contains('active')) renderCommittees();
 }
 
 function memberList() {
@@ -1909,6 +1976,7 @@ function renderApprovalBadge() {
 function meetingItemHTML(m) {
   const d = new Date(m.date);
   const months = ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
+  const creator = m.createdBy ? `<div style="font-size:11px; color:var(--gray); margin-top:4px;">✍️ ${m.createdBy}</div>` : '';
   return `<div class="meeting-item">
     <div class="meeting-date-box">
       <div class="meeting-date-day">${d.getDate()}</div>
@@ -1917,6 +1985,7 @@ function meetingItemHTML(m) {
     <div class="meeting-info">
       <div class="meeting-name">${m.title}</div>
       <div class="meeting-meta">🕐 ${m.time} &nbsp;·&nbsp; 📍 ${m.place}</div>
+      ${creator}
     </div>
   </div>`;
 }
@@ -1947,6 +2016,7 @@ function renderMeetingList() {
   el.innerHTML = meetings.map(m => {
     const past = m.date < today;
     const dt = new Date(m.date);
+    const creator = m.createdBy ? `<div style="font-size:11px; color:var(--gray); margin-top:4px;">✍️ Oluşturan: <strong>${m.createdBy}</strong></div>` : '';
     return `<div class="meeting-item">
       <div class="meeting-date-box" style="${past ? 'background:var(--gray)' : ''}">
         <div class="meeting-date-day">${dt.getDate()}</div>
@@ -1955,6 +2025,7 @@ function renderMeetingList() {
       <div class="meeting-info">
         <div class="meeting-name">${m.title} ${past ? '<span class="badge badge-gray">Geçmiş</span>' : '<span class="badge badge-green">Yaklaşan</span>'}</div>
         <div class="meeting-meta">🕐 ${m.time} &nbsp;·&nbsp; 📍 ${m.place}</div>
+        ${creator}
       </div>
     </div>`;
   }).join('');
@@ -2049,17 +2120,29 @@ function renderMembers() {
     el.innerHTML = '<tr><td colspan="4" style="text-align:center; color:var(--gray); padding:32px;">Üye yok</td></tr>';
     return;
   }
-  el.innerHTML = members.map(m => `<tr>
-    <td>
-      <div style="display:flex; align-items:center; gap:10px;">
-        <div class="user-avatar" style="width:32px; height:32px; font-size:12px; background:var(--navy-light);">${initials(m.name)}</div>
-        <div style="font-weight:600;">${m.name}</div>
-      </div>
-    </td>
-    <td><span class="badge ${roleBadge(m.role)}">${m.role}</span></td>
-    <td><div style="font-size:12px;">${m.email}</div><div style="font-size:11px; color:var(--gray)">${m.phone || ''}</div></td>
-    <td><span class="badge badge-green">Aktif</span></td>
-  </tr>`).join('');
+  el.innerHTML = members.map(m => {
+    const userCommittees = getUserCommittees(m._key);
+    const committeeBadges = userCommittees.length
+      ? `<div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:6px;">${userCommittees.map(c => {
+          const col = getCommitteeColor(c.color || 'navy');
+          return `<span style="display:inline-flex; align-items:center; padding:2px 8px; border-radius:10px; font-size:10px; font-weight:600; background:${col.light}; color:${col.bg};">${c.name}</span>`;
+        }).join('')}</div>`
+      : '';
+    return `<tr>
+      <td>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div class="user-avatar" style="width:32px; height:32px; font-size:12px; background:var(--navy-light);">${initials(m.name)}</div>
+          <div>
+            <div style="font-weight:600;">${m.name}</div>
+            ${committeeBadges}
+          </div>
+        </div>
+      </td>
+      <td><span class="badge ${roleBadge(m.role)}">${m.role}</span></td>
+      <td><div style="font-size:12px;">${m.email}</div><div style="font-size:11px; color:var(--gray)">${m.phone || ''}</div></td>
+      <td><span class="badge badge-green">Aktif</span></td>
+    </tr>`;
+  }).join('');
 }
 
 // ═══════════════════════════════════════════════
@@ -2204,6 +2287,7 @@ window.selectDay = function(ds) {
       </div>
       <div style="font-size:12px; color:var(--gray); margin-bottom:6px;">📍 ${m.place}</div>
       ${m.agenda ? `<div style="font-size:12px; color:var(--navy); white-space:pre-wrap; padding:8px; background:var(--white); border-radius:6px; margin-top:6px;">${m.agenda}</div>` : ''}
+      ${m.createdBy ? `<div style="font-size:11px; color:var(--gray); margin-top:8px; padding-top:8px; border-top:1px solid rgba(0,0,0,0.05);">✍️ Oluşturan: <strong>${m.createdBy}</strong></div>` : ''}
     </div>
   `).join('');
 };
@@ -2876,6 +2960,193 @@ window.deleteMagazine = async function(key) {
 };
 
 // ═══════════════════════════════════════════════
+// KOMİSYONLAR
+// ═══════════════════════════════════════════════
+
+const COMMITTEE_COLORS = [
+  { key: 'navy', bg: '#112244', light: 'rgba(17,34,68,0.1)' },
+  { key: 'gold', bg: '#c8a84b', light: 'rgba(200,168,75,0.15)' },
+  { key: 'green', bg: '#1e7a5c', light: 'rgba(30,122,92,0.12)' },
+  { key: 'purple', bg: '#6d28d9', light: 'rgba(139,92,246,0.12)' },
+  { key: 'red', bg: '#c0392b', light: 'rgba(192,57,43,0.1)' },
+  { key: 'teal', bg: '#0d9488', light: 'rgba(13,148,136,0.12)' },
+  { key: 'orange', bg: '#ea580c', light: 'rgba(234,88,12,0.12)' },
+  { key: 'pink', bg: '#db2777', light: 'rgba(219,39,119,0.12)' }
+];
+
+function getCommitteeColor(key) {
+  return COMMITTEE_COLORS.find(c => c.key === key) || COMMITTEE_COLORS[0];
+}
+
+// Üyenin dahil olduğu komisyonları bul
+function getUserCommittees(userKey) {
+  return toArray(DATA.committees).filter(c => (c.members || []).includes(userKey));
+}
+
+function renderCommittees() {
+  const el = $('committeesContent');
+  const committees = toArray(DATA.committees);
+  if (!committees.length) {
+    el.innerHTML = `<div class="card"><div class="card-body"><div class="empty-state" style="padding:48px 20px;">
+      <div class="empty-state-icon">🏛️</div>
+      <div class="empty-state-text" style="font-size:15px; margin-bottom:8px;">Henüz komisyon yok</div>
+      <div style="font-size:12px; color:var(--gray);">Çalışma komisyonları oluşturup üyeleri atayabilirsiniz.</div>
+      ${isAdmin() ? `<button class="btn-action" style="margin-top:20px;" onclick="openAddCommittee()">+ İlk Komisyonu Oluştur</button>` : ''}
+    </div></div></div>`;
+    return;
+  }
+
+  el.innerHTML = `<div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap:16px;">` +
+    committees.map(c => {
+      const color = getCommitteeColor(c.color || 'navy');
+      const members = (c.members || []).map(uid => DATA.members[uid]).filter(m => m && m.status === 'aktif');
+      return `<div class="card" style="border-top:4px solid ${color.bg};">
+        <div class="card-header" style="background:${color.light};">
+          <div>
+            <div class="card-title" style="color:var(--navy);">${c.name}</div>
+            ${c.desc ? `<div style="font-size:12px; color:var(--gray); margin-top:4px; line-height:1.5;">${c.desc}</div>` : ''}
+          </div>
+        </div>
+        <div class="card-body">
+          <div style="font-size:11px; letter-spacing:1.5px; text-transform:uppercase; color:var(--gray); margin-bottom:10px;">
+            👥 ${members.length} Üye
+          </div>
+          ${members.length === 0
+            ? `<div style="color:var(--gray); font-size:12px; padding:12px 0;">Henüz üye atanmamış.</div>`
+            : `<div style="display:flex; flex-direction:column; gap:8px;">${members.map(m => `
+                <div style="display:flex; align-items:center; gap:10px;">
+                  <div class="user-avatar" style="width:30px; height:30px; font-size:11px; background:${color.bg}; color:white;">${initials(m.name)}</div>
+                  <div style="flex:1;">
+                    <div style="font-size:13px; font-weight:600; color:var(--navy);">${m.name}</div>
+                    <div style="font-size:10px; color:var(--gray);">${m.role}</div>
+                  </div>
+                </div>
+              `).join('')}</div>`}
+          ${isAdmin() ? `
+            <div style="display:flex; gap:6px; margin-top:14px; padding-top:14px; border-top:1px solid var(--gray-light);">
+              <button class="btn-secondary" style="padding:6px 12px; font-size:11px; flex:1;" onclick="openAssignMembers('${c._key}')">👥 Üye Ata</button>
+              <button class="btn-action" style="padding:6px 12px; font-size:11px;" onclick="openEditCommittee('${c._key}')">✏️</button>
+              <button class="btn-danger" style="padding:6px 10px; font-size:11px;" onclick="deleteCommittee('${c._key}')">🗑️</button>
+            </div>
+          ` : ''}
+        </div>
+      </div>`;
+    }).join('') + `</div>`;
+}
+
+function renderColorPicker(selected = 'navy') {
+  $('committeeColor').value = selected;
+  $('committeeColorPicker').innerHTML = COMMITTEE_COLORS.map(c => `
+    <div onclick="selectCommitteeColor('${c.key}')" style="width:32px; height:32px; border-radius:50%; background:${c.bg}; cursor:pointer; border:3px solid ${selected === c.key ? 'var(--navy)' : 'transparent'}; transition:border-color 0.15s;" data-color="${c.key}"></div>
+  `).join('');
+}
+
+window.selectCommitteeColor = function(key) {
+  $('committeeColor').value = key;
+  renderColorPicker(key);
+};
+
+window.openAddCommittee = function() {
+  $('committeeModalTitle').textContent = 'Yeni Komisyon';
+  $('committeeId').value = '';
+  $('committeeName').value = '';
+  $('committeeDesc').value = '';
+  renderColorPicker('navy');
+  openModal('modalCommittee');
+};
+
+window.openEditCommittee = function(key) {
+  const c = DATA.committees[key];
+  if (!c) return;
+  $('committeeModalTitle').textContent = 'Komisyon Düzenle';
+  $('committeeId').value = key;
+  $('committeeName').value = c.name || '';
+  $('committeeDesc').value = c.desc || '';
+  renderColorPicker(c.color || 'navy');
+  openModal('modalCommittee');
+};
+
+window.saveCommittee = async function() {
+  const name = $('committeeName').value.trim();
+  if (!name) { showToast('Komisyon adı zorunludur.', 'error'); return; }
+  const id = $('committeeId').value;
+  const desc = $('committeeDesc').value.trim();
+  const color = $('committeeColor').value;
+  const btn = $('saveCommitteeBtn');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
+  try {
+    if (id) {
+      // Düzenleme — mevcut üyeleri koru
+      await update(ref(db, 'committees/' + id), { name, desc, color });
+      showToast('Komisyon güncellendi!', 'success');
+    } else {
+      // Yeni komisyon
+      const newRef = push(ref(db, 'committees'));
+      await set(newRef, {
+        name, desc, color,
+        members: [],
+        createdBy: currentProfile.name,
+        createdAt: new Date().toISOString().split('T')[0]
+      });
+      showToast('Komisyon oluşturuldu!', 'success');
+    }
+    closeModal('modalCommittee');
+  } catch (e) { showToast('Hata: ' + e.message, 'error'); }
+  btn.disabled = false; btn.innerHTML = 'Kaydet';
+};
+
+window.deleteCommittee = async function(key) {
+  const c = DATA.committees[key];
+  if (!c) return;
+  if (!confirm(`"${c.name}" komisyonunu silmek istediğinize emin misiniz?`)) return;
+  try {
+    await remove(ref(db, 'committees/' + key));
+    showToast('Komisyon silindi.', 'success');
+  } catch (e) { showToast('Hata: ' + e.message, 'error'); }
+};
+
+window.openAssignMembers = function(key) {
+  const c = DATA.committees[key];
+  if (!c) return;
+  $('assignCommitteeId').value = key;
+  $('committeeMembersTitle').textContent = `${c.name} — Üye Ata`;
+  const current = c.members || [];
+  const members = memberList();
+  const color = getCommitteeColor(c.color || 'navy');
+
+  if (!members.length) {
+    $('committeeMembersList').innerHTML = '<div style="color:var(--gray); padding:20px; text-align:center;">Atanacak üye yok.</div>';
+  } else {
+    $('committeeMembersList').innerHTML = members.map(m => `
+      <label class="attendee-check" style="cursor:pointer;">
+        <input type="checkbox" value="${m._key}" ${current.includes(m._key) ? 'checked' : ''} style="accent-color:${color.bg};">
+        <div style="display:flex; align-items:center; gap:10px; flex:1;">
+          <div class="user-avatar" style="width:28px; height:28px; font-size:11px; background:var(--navy-light);">${initials(m.name)}</div>
+          <div>
+            <div style="font-size:13px; font-weight:600;">${m.name}</div>
+            <div style="font-size:11px; color:var(--gray);">${m.role}</div>
+          </div>
+        </div>
+      </label>
+    `).join('');
+  }
+  openModal('modalCommitteeMembers');
+};
+
+window.saveCommitteeMembers = async function() {
+  const key = $('assignCommitteeId').value;
+  const checked = Array.from($('committeeMembersList').querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value);
+  const btn = $('saveCommitteeMembersBtn');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
+  try {
+    await update(ref(db, 'committees/' + key), { members: checked });
+    closeModal('modalCommitteeMembers');
+    showToast('Üyeler güncellendi!', 'success');
+  } catch (e) { showToast('Hata: ' + e.message, 'error'); }
+  btn.disabled = false; btn.innerHTML = 'Kaydet';
+};
+
+// ═══════════════════════════════════════════════
 // MODAL YÖNETİMİ
 // ═══════════════════════════════════════════════
 window.openModal = function(id) {
@@ -2883,6 +3154,9 @@ window.openModal = function(id) {
     const sel = $('noteMeeting');
     sel.innerHTML = '<option value="">-- Toplantı Seçin --</option>' +
       toArray(DATA.meetings).map(m => `<option value="${m._key}">${m.title}</option>`).join('');
+  }
+  if (id === 'modalCommittee' && !$('committeeId').value) {
+    renderColorPicker('navy');
   }
   $(id).classList.add('open');
 };
